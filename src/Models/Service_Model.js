@@ -8,6 +8,7 @@ const ServiceSchema = new Schema({
         ref:"users",
         required:true
     },
+    //nombre del servicio
     category:{
         type:String,
         required:true
@@ -16,6 +17,22 @@ const ServiceSchema = new Schema({
         type:String,
         required:true
     },
+    //contactos para el servicio
+    phone:{
+        type:String,
+        required:true
+    },
+    email:{
+        type:String,
+        required:true
+    },
+    location:{
+        type:{
+            type:String,
+            default:"Point"
+        },
+        coordinates:[Number]
+    },
     //url de fotos
     photos:[
         {type:String}
@@ -23,5 +40,8 @@ const ServiceSchema = new Schema({
     
     //imprime fecha de creacion y actualizacion
 },{timestamps:true});
+
+ServiceSchema.index({ user_id: 1 }); // para busquedas mas rapidas
+ServiceSchema.index({ location: '2dsphere' }); // para geolocalizacion
 
 export const ServiceModel = model("services",ServiceSchema)

@@ -1,5 +1,6 @@
 import { model, Schema } from "mongoose";
-//usar bcrypt
+import bcrypt from "bcrypt"
+
 
 const UserSchema = new Schema({
     name:{
@@ -14,19 +15,9 @@ const UserSchema = new Schema({
         type:String,
         required:true
     },
-    phone:{
-        type:String,
-        required:true
-    },
+    //url de imagen
     profilePhoto:{
         type:String
-    },
-    location:{
-        type:{
-            type:String,
-            default:"Point"
-        },
-        coordinates:[Number]
     },
     isVerified:{
         type:Boolean,
@@ -34,9 +25,17 @@ const UserSchema = new Schema({
     },
 },{timestamps:true});
 
-//cifrado de contraseña antes de guardar(pendiente)
+//cifrar la contraseña antes de guardar
+UserSchema.pre('save', async function(next) {
+  if (!this.isModified('password')) return next();
+  this.password = await bcrypt.hash(this.password, 10);
+  next();
+});
 
-//metodo para comparar contraseñas(pendiente)
+//comparar contraseñas
+UserSchema.methods.comparePassword = async function(candidatePassword) {
+  return await bcrypt.compare(candidatePassword, this.password);
+};
 
 
 export const UserModel = model("users", UserSchema);
