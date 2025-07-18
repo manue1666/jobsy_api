@@ -1,5 +1,6 @@
 import express from "express"
 import cors from "cors";
+import { getAllUsers, login, register } from "./Controllers/User_Controller.js";
 
 
 //servidor
@@ -14,7 +15,14 @@ app.get("/",(_req,res)=>{
     res.send("servidor js corriendo")
 })
 
-//enpoints
+//ENDPOINTS
+
+//user endpoints
+app.get("/user/get", getAllUsers)
+app.post("/user/regist",register)
+app.post("/user/login", login)
+
+
 
 
 

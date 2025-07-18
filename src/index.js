@@ -10,6 +10,7 @@ async function main() {
         console.log("Aplicacion conectada a la base de datos")
         app.listen(4000,()=>{
             console.log("Aplicacion corriendo")
+            //este solo es un log del el localhost
             console.log("http://127.0.0.1:4000")
         })
     } catch (error) {
