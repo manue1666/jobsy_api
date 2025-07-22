@@ -19,6 +19,13 @@ const UserSchema = new Schema({
     profilePhoto:{
         type:String
     },
+    user_location:{
+        type:{
+            type:String,
+            default:"Point"
+        },
+        coordinates:[Number]
+    },
     isVerified:{
         type:Boolean,
         default:false
@@ -37,5 +44,6 @@ UserSchema.methods.comparePassword = async function(candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);
 };
 
+UserSchema.index({ user_location: '2dsphere' }); // para geolocalizacion
 
 export const UserModel = model("users", UserSchema);

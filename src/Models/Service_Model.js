@@ -1,4 +1,5 @@
 import { model, Schema } from "mongoose";
+import { CATEGORIES } from "../utils/constants";
 
 
 const ServiceSchema = new Schema({
@@ -9,9 +10,15 @@ const ServiceSchema = new Schema({
         required:true
     },
     //nombre del servicio
-    category:{
+    service_name:{
         type:String,
         required:true
+    },
+    //categoria del servicio
+    category:{
+        type:String,
+        required:true,
+        enum:CATEGORIES
     },
     description:{
         type:String,
@@ -26,7 +33,7 @@ const ServiceSchema = new Schema({
         type:String,
         required:true
     },
-    location:{
+    service_location:{
         type:{
             type:String,
             default:"Point"
@@ -41,7 +48,8 @@ const ServiceSchema = new Schema({
     //imprime fecha de creacion y actualizacion
 },{timestamps:true});
 
+
 ServiceSchema.index({ user_id: 1 }); // para busquedas mas rapidas
-ServiceSchema.index({ location: '2dsphere' }); // para geolocalizacion
+ServiceSchema.index({ service_location: '2dsphere' }); // para geolocalizacion
 
 export const ServiceModel = model("services",ServiceSchema)
