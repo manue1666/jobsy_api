@@ -3,34 +3,48 @@ import bcrypt from "bcrypt"
 
 
 const UserSchema = new Schema({
-    name:{
-        type:String,
-        required:true
+    name: {
+        type: String,
+        required: true
     },
-    email:{
-        type:String,
-        required:true
+    email: {
+        type: String,
+        required: true,
+        unique: true
     },
-    password:{
-        type:String,
-        required:true
+    password: {
+        type: String,
+        required: true
     },
-    //url de imagen
-    profilePhoto:{
-        type:String
+    profilePhoto: {
+        type: String
     },
-    user_location:{
-        type:{
-            type:String,
-            default:"Point"
+    user_location: {
+        type: {
+            type: String,
+            default: "Point",
+            enum: ["Point"], 
+            required: false
         },
-        coordinates:[Number]
+        coordinates: {
+            type: [Number],
+            default: [0, 0], 
+            validate: {
+                validator: function(v) {
+                    return v.length === 2 && 
+                           typeof v[0] === 'number' && 
+                           typeof v[1] === 'number';
+                },
+                message: props => `${props.value} no es un conjunto de coordenadas válido [longitud, latitud]`
+            },
+            required: false
+        }
     },
-    isVerified:{
-        type:Boolean,
-        default:false
+    isVerified: {
+        type: Boolean,
+        default: false
     },
-},{timestamps:true});
+}, { timestamps: true });
 
 //cifrar la contraseña antes de guardar
 UserSchema.pre('save', async function(next) {
@@ -44,6 +58,5 @@ UserSchema.methods.comparePassword = async function(candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);
 };
 
-UserSchema.index({ user_location: '2dsphere' }); // para geolocalizacion
 
 export const UserModel = model("users", UserSchema);

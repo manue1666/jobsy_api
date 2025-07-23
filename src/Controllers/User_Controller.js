@@ -27,7 +27,7 @@ export const register = async (req, res) => {
         //buscar si ya existe el usuario
         const userExist = await UserModel.findOne({email})
         if(userExist){
-            res.status(400).json({
+            return res.status(400).json({
                 "msg":"el usuario ya esta registrado"
             })
         }
@@ -42,7 +42,9 @@ export const register = async (req, res) => {
         })
 
     } catch (error) {
+        console.log(error)
         res.status(500).json({"error":"error al crear usuario"})
+    
     }
 };
 
