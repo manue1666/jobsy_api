@@ -1,6 +1,7 @@
 import express from "express"
 import cors from "cors";
 import { getAllUsers, login, register } from "./Controllers/User_Controller.js";
+import { createService, deleteService, getServiceById, getUserServices, updateService } from "./Controllers/Service_Controller.js";
 
 
 //servidor
@@ -21,6 +22,13 @@ app.get("/",(_req,res)=>{
 app.get("/user/get", getAllUsers)
 app.post("/user/regist",register)
 app.post("/user/login", login)
+
+//service endpoints
+app.post("/service/post", createService)
+app.get("/service/get/:id", getServiceById)
+app.get("/service/user", getUserServices)
+app.patch("/service/patch/:id", updateService)
+app.delete("/service/delete/:id", deleteService)
 
 
 

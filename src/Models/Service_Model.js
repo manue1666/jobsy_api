@@ -1,5 +1,5 @@
 import { model, Schema } from "mongoose";
-import { CATEGORIES } from "../utils/constants";
+import { CATEGORIES } from "../utils/constants.js";
 
 
 const ServiceSchema = new Schema({
@@ -33,17 +33,37 @@ const ServiceSchema = new Schema({
         type:String,
         required:true
     },
-    service_location:{
-        type:{
-            type:String,
-            default:"Point"
+    address:{
+        type:String,
+        required:false,
+        default:"sin direccion"
+    },
+    service_location: {
+        type: {
+            type: String,
+            default: "Point",
+            enum: ["Point"], 
+            required: false
         },
-        coordinates:[Number]
+        coordinates: {
+            type: [Number],
+            default: [0, 0], 
+            validate: {
+                validator: function(v) {
+                    return v.length === 2 && 
+                           typeof v[0] === 'number' && 
+                           typeof v[1] === 'number';
+                },
+                message: props => `${props.value} no es un conjunto de coordenadas válido [longitud, latitud]`
+            },
+            required: false
+        }
     },
     //url de fotos
-    photos:[
-        {type:String}
-    ],
+    photos:{
+        type:[String],
+        default:[]
+    },
     
     //imprime fecha de creacion y actualizacion
 },{timestamps:true});
