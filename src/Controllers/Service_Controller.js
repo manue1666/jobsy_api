@@ -7,7 +7,7 @@ import { CATEGORIES } from "../utils/constants.js";
 export const createService = [authenticateToken, async (req, res) => {
     try {
         
-        const { service_name, category, description, phone, email, address, photos } = req.body;
+        const { service_name, category, description, phone, email, address, photos, tipo } = req.body;
         const user_id = req.user.user_id; // el id se obtiene del token
 
         if(!service_name || !category || !description || !phone || !email){
@@ -24,7 +24,8 @@ export const createService = [authenticateToken, async (req, res) => {
             phone,
             email,
             photos,
-            address
+            address,
+            tipo
         });
 
         res.status(200).json({

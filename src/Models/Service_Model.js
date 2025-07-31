@@ -64,6 +64,11 @@ const ServiceSchema = new Schema({
         type:[String],
         default:[]
     },
+    tipo:{
+        type:[String],
+        enum:["domicilio","comercio"],
+        default:[]
+    }
     
     //imprime fecha de creacion y actualizacion
 },{timestamps:true});
