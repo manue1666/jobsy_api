@@ -4,6 +4,11 @@ import { UserModel } from "../Models/User_Model.js"
 import { authenticateToken } from "../utils/authMiddleware.js";
 import { generateToken } from "../utils/jwt.js";
 import bcrypt from "bcrypt"
+import multer from 'multer';
+import { deleteImage, uploadImage } from "../utils/imageService.js";
+
+
+const upload = multer({ dest: 'tmp/uploads/' });
 
 
 export const getAllUsers = async (_req, res) => {
@@ -80,74 +85,56 @@ export const login = async (req, res) => {
     }
 }
 
-export const updateUser = [authenticateToken, async (req, res) => {
+
+export const updateUser = [
+  authenticateToken,
+  upload.single('profileImage'), // Middleware para procesar la imagen
+  async (req, res) => {
     try {
-        const { id } = req.params;
-        const user_id = req.user.user_id;
-        const updateData = req.body;
+      const { id } = req.params;
+      const user_id = req.user.user_id;
+      const updateData = req.body;
 
-        const user = await UserModel.findOne({ _id: id, _id: user_id });
+      const user = await UserModel.findOne({ _id: id, _id: user_id });
+      if (!user) return res.status(404).json({ error: "Usuario no encontrado" });
 
-        if (!user) {
-            return res.status(404).json({
-                error: "Usuario no encontrado o no tienes permisos"
-            });
-        }
+      // 1. Manejo de imagen
+      if (req.file) {
+        if (user.profilePhoto) await deleteImage(user.profilePhoto);
+        updateData.profilePhoto = await uploadImage(req.file.path, 'profiles');
+      }
 
-        const allowedUpdates = ['name', 'email', 'profilePhoto', 'user_location', 'password'];
-        const updates = Object.keys(updateData);
-        const filteredUpdates = updates.filter(field => field !== 'currentPassword');
-        const isValidOperation = filteredUpdates.every(update => allowedUpdates.includes(update));
+      // 2. Validar campos permitidos
+      const allowedUpdates = ['name', 'email', 'profilePhoto', 'user_location', 'password'];
+      const updates = Object.keys(updateData);
+      const isValidOperation = updates.every(update => allowedUpdates.includes(update));
 
-        if (!isValidOperation) {
-            return res.status(400).json({ error: "Actualizaciones no válidas" });
-        }
+      if (!isValidOperation) {
+        return res.status(400).json({ error: "Actualizaciones no válidas" });
+      }
 
-        // Si va a cambiar la contraseña, verificar que envió currentPassword
-        if (updateData.password) {
-            if (!updateData.currentPassword) {
-                return res.status(400).json({ error: "Debes ingresar la contraseña actual para cambiarla" });
-            }
+      // 3. Actualizar campos
+      updates.forEach(update => {
+        user[update] = updateData[update];
+      });
 
-            const passwordCorrecta = await bcrypt.compare(updateData.currentPassword, user.password);
-            if (!passwordCorrecta) {
-                return res.status(400).json({ error: "La contraseña actual es incorrecta" });
-            }
-        }
+      await user.save();
 
-        // Aplicar actualizaciones
-        updates.forEach(update => {
-            if (update !== 'currentPassword') {
-                user[update] = updateData[update];
-            }
-        });
+      // 4. Eliminar contraseña de la respuesta
+      const userObj = user.toObject();
+      delete userObj.password;
 
-        await user.save();
-
-        const userObj = user.toObject();
-        delete userObj.password;
-
-        res.status(200).json({
-            msg: "Usuario actualizado con éxito",
-            user: userObj
-        });
+      res.status(200).json({
+        msg: "Usuario actualizado",
+        user: userObj
+      });
 
     } catch (error) {
-        console.log(error);
-
-        if (error.name === 'CastError') {
-            return res.status(400).json({ error: "ID de usuario inválido" });
-        }
-
-        if (error.name === 'ValidationError') {
-            return res.status(400).json({ error: error.message });
-        }
-
-        res.status(500).json({
-            error: "Algo salió mal en el servidor"
-        });
+      console.error(error);
+      res.status(500).json({ error: "Error del servidor" });
     }
-}];
+  }
+];
 
 
 export const deleteUser = [authenticateToken, async (req, res) => {

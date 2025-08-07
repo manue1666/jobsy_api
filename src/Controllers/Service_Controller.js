@@ -2,50 +2,64 @@ import { FavServiceModel } from "../Models/FavService_Model.js";
 import { ServiceModel } from "../Models/Service_Model.js";
 import { authenticateToken } from "../utils/authMiddleware.js";
 import { CATEGORIES } from "../utils/constants.js";
+import multer from 'multer';
+import { uploadMultipleImages } from "../utils/imageService.js";
+
+export const uploadServiceImages = multer({
+  dest: 'tmp/uploads/services',
+  limits: { fileSize: 10 * 1024 * 1024, files: 5 } // 10MB c/u, máximo 5 imágenes
+}).array('serviceImages', 5); // 'serviceImages' debe coincidir con el FormData
 
 
-export const createService = [authenticateToken, async (req, res) => {
+export const createService = [
+  authenticateToken,
+  uploadServiceImages, // Middleware Multer
+  async (req, res) => {
     try {
+      const { 
+        service_name, 
+        category, 
+        description, 
+        phone, 
+        email, 
+        address, 
+        tipo 
+      } = req.body;
 
-        const { service_name, category, description, phone, email, address, photos, tipo } = req.body;
-        const user_id = req.user.user_id; // el id se obtiene del token
+      // 1. Subir imágenes si existen
+      let photos = [];
+      if (req.files?.length > 0) {
+        photos = await uploadMultipleImages(
+          req.files.map(file => file.path),
+          'marketplace/services'
+        );
+      }
 
-        if (!service_name || !category || !description || !phone || !email) {
-            return res.status(400).json({
-                "error": "datos minimos incompletos"
-            });
-        }
+      // 2. Crear el servicio
+      const service = new ServiceModel({
+        user_id: req.user.user_id,
+        service_name,
+        category,
+        description,
+        phone,
+        email,
+        address,
+        photos,
+        tipo: JSON.parse(tipo || '[]') // Asegurar que sea array
+      });
 
-        const service = await ServiceModel.create({
-            user_id,
-            service_name,
-            category,
-            description,
-            phone,
-            email,
-            photos,
-            address,
-            tipo
-        });
+      await service.save();
 
-        res.status(200).json({
-            "msg": "servicio creado con exito",
-            service: service.toObject()
-        });
+      res.status(201).json({
+        service: service.toObject({ virtuals: true })
+      });
 
     } catch (error) {
-        console.log(error);
-
-        // Manejar errores específicos de MongoDB
-        if (error.name === 'ValidationError') {
-            return res.status(400).json({ error: error.message });
-        }
-
-        res.status(500).json({
-            "error": "algo salio mal en el servidor"
-        });
+      console.error(error);
+      res.status(500).json({ error: error.message });
     }
-}];
+  }
+];
 
 export const getServiceById = [authenticateToken, async (req, res) => {
     try {
