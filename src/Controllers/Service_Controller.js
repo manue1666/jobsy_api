@@ -6,59 +6,59 @@ import multer from 'multer';
 import { uploadMultipleImages } from "../utils/imageService.js";
 
 export const uploadServiceImages = multer({
-  dest: 'tmp/uploads/services',
-  limits: { fileSize: 10 * 1024 * 1024, files: 5 } // 10MB c/u, máximo 5 imágenes
+    dest: 'tmp/uploads/services',
+    limits: { fileSize: 10 * 1024 * 1024, files: 5 } // 10MB c/u, máximo 5 imágenes
 }).array('serviceImages', 5); // 'serviceImages' debe coincidir con el FormData
 
 
 export const createService = [
-  authenticateToken,
-  uploadServiceImages, // Middleware Multer
-  async (req, res) => {
-    try {
-      const { 
-        service_name, 
-        category, 
-        description, 
-        phone, 
-        email, 
-        address, 
-        tipo 
-      } = req.body;
+    authenticateToken,
+    uploadServiceImages, // Middleware Multer
+    async (req, res) => {
+        try {
+            const {
+                service_name,
+                category,
+                description,
+                phone,
+                email,
+                address,
+                tipo
+            } = req.body;
 
-      // 1. Subir imágenes si existen
-      let photos = [];
-      if (req.files?.length > 0) {
-        photos = await uploadMultipleImages(
-          req.files.map(file => file.path),
-          'marketplace/services'
-        );
-      }
+            // 1. Subir imágenes si existen
+            let photos = [];
+            if (req.files?.length > 0) {
+                photos = await uploadMultipleImages(
+                    req.files.map(file => file.path),
+                    'marketplace/services'
+                );
+            }
 
-      // 2. Crear el servicio
-      const service = new ServiceModel({
-        user_id: req.user.user_id,
-        service_name,
-        category,
-        description,
-        phone,
-        email,
-        address,
-        photos,
-        tipo: JSON.parse(tipo || '[]') // Asegurar que sea array
-      });
+            // 2. Crear el servicio
+            const service = new ServiceModel({
+                user_id: req.user.user_id,
+                service_name,
+                category,
+                description,
+                phone,
+                email,
+                address,
+                photos,
+                tipo: JSON.parse(tipo || '[]') // Asegurar que sea array
+            });
 
-      await service.save();
+            await service.save();
 
-      res.status(201).json({
-        service: service.toObject({ virtuals: true })
-      });
+            res.status(201).json({
+                service: service.toObject({ virtuals: true })
+            });
 
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: error.message });
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ error: error.message });
+        }
     }
-  }
 ];
 
 export const getServiceById = [authenticateToken, async (req, res) => {
@@ -94,7 +94,10 @@ export const getUserServices = [authenticateToken, async (req, res) => {
     try {
         const user_id = req.user.user_id;
 
-        const services = await ServiceModel.find({ user_id }).lean();
+        const services = await ServiceModel.find({ user_id }).populate(
+            'user_id',
+            'name profilePhoto'
+        ).lean();
 
         res.status(200).json({
             count: services.length,
