@@ -22,7 +22,7 @@ export const addFavoriteService = [authenticateToken, async (req, res) => {
         });
 
         if (existingFavorite) {
-            return res.status(400).json({
+            return res.status(409).json({
                 error: "Este servicio ya está en tus favoritos"
             });
         }

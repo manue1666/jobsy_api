@@ -15,7 +15,7 @@ export const getAllUsers = async (_req, res) => {
     try {
         const users = await UserModel.find({}, { password: 0 });
         if (users.length == 0) {
-            return res.status(400).json({
+            return res.status(404).json({
                 "error": "no hay usuarios para mostrar"
             })
         }
@@ -36,7 +36,7 @@ export const register = async (req, res) => {
         //buscar si ya existe el usuario
         const userExist = await UserModel.findOne({ email })
         if (userExist) {
-            return res.status(400).json({
+            return res.status(409).json({
                 "msg": "el usuario ya esta registrado"
             })
         }
@@ -46,7 +46,7 @@ export const register = async (req, res) => {
         const userObj = user.toObject()
 
 
-        res.status(200).json({
+        res.status(201).json({
             user: userObj
         })
 
