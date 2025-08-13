@@ -43,11 +43,10 @@ const ServiceSchema = new Schema({
             type: String,
             default: "Point",
             enum: ["Point"], 
-            required: false
+            required: true
         },
         coordinates: {
             type: [Number],
-            default: [0, 0], 
             validate: {
                 validator: function(v) {
                     return v.length === 2 && 
