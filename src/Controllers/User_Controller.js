@@ -208,17 +208,3 @@ export const getCurrentUserProfile = [authenticateToken, async (req, res) => {
     }
 }];
 
-
-export const updateUserLocation = async (req, res) => {
-  const { longitude, latitude } = req.body;
-  try {
-    const user = await UserModel.findByIdAndUpdate(
-      req.user._id,
-      { user_location: { type: "Point", coordinates: [longitude, latitude] } },
-      { new: true }
-    );
-    res.json(user);
-  } catch (error) {
-    res.status(500).json({ error: "Error al actualizar ubicación" });
-  }
-};

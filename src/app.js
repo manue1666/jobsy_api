@@ -1,7 +1,7 @@
 import express from "express"
 import cors from "cors";
 import { deleteUser, getAllUsers, getCurrentUserProfile, login, register, updateUser } from "./Controllers/User_Controller.js";
-import { createService, deleteService, getServiceById, getUserServices, searchServices, updateService } from "./Controllers/Service_Controller.js";
+import { createService, deleteService, getServiceById, getUserServices, searchServices, searchServicesNearby, updateService } from "./Controllers/Service_Controller.js";
 import { addFavoriteService, getFavoriteServices, removeFavoriteService } from "./Controllers/FavService_Controller.js";
 
 
@@ -34,6 +34,7 @@ app.get("/service/user", getUserServices)
 app.patch("/service/patch/:id", updateService)
 app.delete("/service/delete/:id", deleteService)
 app.get("/service/search", searchServices)
+app.get("/service/nearby",searchServicesNearby)
 
 //FavService endpoints
 app.post("/fav/post/:id", addFavoriteService)
