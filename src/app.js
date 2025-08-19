@@ -3,19 +3,27 @@ import cors from "cors";
 import { deleteUser, getAllUsers, getCurrentUserProfile, login, register, updateUser } from "./Controllers/User_Controller.js";
 import { addFavoriteService, getFavoriteServices, removeFavoriteService } from "./Controllers/FavService_Controller.js";
 import { createService, deleteService, getServiceById, getUserServices, searchServices, searchServicesNearby, updateService } from "./Controllers/services_controllers/index.js";
+import { handleStripeWebhook } from "./utils/stripeWebHook.js";
+import { boostService } from "./Controllers/services_controllers/boost_service.js";
 
 
 //servidor
 const app = express()
 
 app.use(cors());
-
+//HOOK DE STRIPE
+app.post(
+  '/webhook',
+  express.raw({ type: 'application/json' }), // Raw solo para webhook
+  handleStripeWebhook
+);
 app.use(express.json())
 app.use(express.urlencoded({extended:true}))
 
 app.get("/",(_req,res)=>{
     res.send("servidor js corriendo")
 })
+
 
 //ENDPOINTS
 
@@ -35,6 +43,7 @@ app.patch("/service/patch/:id", updateService)
 app.delete("/service/delete/:id", deleteService)
 app.get("/service/search", searchServices)
 app.get("/service/nearby",searchServicesNearby)
+app.post('/service/boost/:id',boostService);
 
 //FavService endpoints
 app.post("/fav/post/:id", addFavoriteService)
