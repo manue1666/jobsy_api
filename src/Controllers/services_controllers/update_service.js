@@ -19,16 +19,14 @@ export const updateService = [
       const user_id = req.user.user_id;
       const updateData = req.body;
 
-      // Verificar que el servicio exista y pertenezca al usuario
+      // Verificar servicio y permisos
       const service = await ServiceModel.findOne({ _id: id, user_id });
-
-      if (!service) {
+      if (!service)
         return res.status(404).json({
           error: "Servicio no encontrado o no tienes permisos",
         });
-      }
 
-      // Campos permitidos para actualización (incluyendo 'tipo')
+      // Campos permitidos
       const allowedUpdates = [
         "service_name",
         "category",
@@ -36,18 +34,11 @@ export const updateService = [
         "phone",
         "email",
         "address",
-        "photos",
-        "tipo"
+        "tipo",
       ];
-      
-      const updates = Object.keys(req.body);
-      const isValidOperation = updates.every(update => allowedUpdates.includes(update));
+      const updates = Object.keys(updateData).filter(u => allowedUpdates.includes(u));
 
-      if (!isValidOperation) {
-        return res.status(400).json({ error: "Actualizaciones no válidas" });
-      }
-
-      // Procesamiento del campo 'tipo' (igual que en createService)
+      // Procesar campo 'tipo'
       if (updateData.tipo) {
         let tipoArray = [];
         try {
@@ -62,16 +53,14 @@ export const updateService = [
           } else if (Array.isArray(updateData.tipo)) {
             tipoArray = updateData.tipo;
           }
-          
           // Validación de tipos
           const validTypes = ["domicilio", "comercio"];
           tipoArray = tipoArray.filter(t => validTypes.includes(t));
           service.tipo = tipoArray.length > 0 ? tipoArray : [];
-          
         } catch (e) {
           console.warn("Error al procesar campo 'tipo':", e.message);
         }
-        delete updateData.tipo; // Eliminamos para no sobrescribir en el forEach
+        delete updateData.tipo;
       }
 
       // Geocodificación si se actualiza la dirección
@@ -88,20 +77,31 @@ export const updateService = [
         };
       }
 
-      // Procesamiento de imágenes (igual que en createService)
+      // Procesar imágenes
+      let existingPhotos = [];
+      if (updateData.existingPhotos) {
+        try {
+          existingPhotos = JSON.parse(updateData.existingPhotos);
+          if (!Array.isArray(existingPhotos)) existingPhotos = [];
+        } catch (e) {
+          console.warn("Error al parsear existingPhotos:", e.message);
+          existingPhotos = [];
+        }
+      }
+
+      let newPhotos = [];
       if (req.files?.length > 0) {
-        const newPhotos = await uploadMultipleImages(
+        newPhotos = await uploadMultipleImages(
           req.files.map(file => file.path),
           "marketplace/services"
         );
-        
-        // Combinamos las fotos existentes con las nuevas (o reemplazamos según tu lógica)
-        service.photos = [...(service.photos || []), ...newPhotos];
       }
+
+      service.photos = [...existingPhotos, ...newPhotos];
 
       // Actualizar los demás campos
       updates.forEach(update => {
-        if (update !== 'tipo' && update !== 'address') {
+        if (update !== "address" && update !== "tipo") {
           service[update] = updateData[update];
         }
       });
