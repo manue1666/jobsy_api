@@ -24,7 +24,7 @@ export const CATEGORIES = [
 ];
 
 export const BOOST_PLANS = {
-  "24h": { amount: 150, durationMs: 24 * 60 * 60 * 1000 },
-  "72h": { amount: 350, durationMs: 72 * 60 * 60 * 1000 },
-  "1week": { amount: 600, durationMs: 7 * 24 * 60 * 60 * 1000 },
+  "24h": { amount: 25, durationMs: 24 * 60 * 60 * 1000 },
+  "72h": { amount: 70, durationMs: 72 * 60 * 60 * 1000 },
+  "1week": { amount: 120, durationMs: 7 * 24 * 60 * 60 * 1000 },
 };

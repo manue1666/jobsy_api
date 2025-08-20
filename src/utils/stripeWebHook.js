@@ -1,6 +1,7 @@
 import stripePackage from 'stripe';
 import { Types } from 'mongoose';
 import { ServiceModel } from '../Models/Service_Model.js';
+import { BOOST_PLANS } from './constants.js';
 
 const stripe = stripePackage(process.env.STRIPE_SECRET_KEY, {
   apiVersion: '2025-07-30.basil'
@@ -53,11 +54,6 @@ export const handleStripeWebhook = async (req, res) => {
   }
 
   // Resto del código igual...
-  const BOOST_PLANS = {
-    '24h': 24 * 60 * 60 * 1000,
-    '72h': 72 * 60 * 60 * 1000,
-    '1week': 7 * 24 * 60 * 60 * 1000
-  };
 
   if (!BOOST_PLANS[planId]) {
     console.error('❌ Plan no válido:', planId);
