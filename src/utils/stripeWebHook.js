@@ -19,32 +19,36 @@ export const handleStripeWebhook = async (req, res) => {
       process.env.STRIPE_WEBHOOK_SECRET
     );
   } catch (err) {
+    console.error('❌ Error verificando webhook:', err.message);
     return res.status(400).json({ error: `Webhook Error: ${err.message}` });
   }
 
   console.log('🔔 Evento recibido:', event.type);
 
-  // Permitir múltiples eventos
+  // Manejar múltiples eventos de pago exitoso
   if (event.type !== 'payment_intent.succeeded' && event.type !== 'charge.succeeded') {
-    console.log('Evento no manejado, respondiendo 200');
+    console.log('⚠️ Evento no manejado, respondiendo 200');
     return res.json({ received: true });
   }
 
-  // Extraer metadata según el tipo de evento
-  let serviceId, planId;
+  // ✅ EXTRAER METADATOS - método compatible con ambos eventos
+  let metadata = {};
   if (event.type === 'payment_intent.succeeded') {
-    console.log('Procesando payment_intent.succeeded');
-    ({ serviceId, planId } = event.data.object.metadata || {});
+    metadata = event.data.object.metadata || {};
+    console.log('💰 Procesando payment_intent.succeeded');
   } else if (event.type === 'charge.succeeded') {
-    console.log('Procesando charge.succeeded');
-    ({ serviceId, planId } = event.data.object.metadata || {});
+    // Para charge.succeeded, los metadatos pueden estar en payment_intent
+    metadata = event.data.object.metadata || {};
+    console.log('💳 Procesando charge.succeeded');
   }
 
-  console.log('Metadata extraída - ServiceId:', serviceId, 'PlanId:', planId);
+  const { serviceId, planId } = metadata;
+  console.log('📋 Metadata extraída - ServiceId:', serviceId, 'PlanId:', planId);
 
-  // Validar metadata
+  // ✅ VALIDACIÓN ROBUSTA DE METADATOS
   if (!serviceId || !planId) {
-    console.error('❌ Metadata faltante');
+    console.error('❌ Metadata faltante o incompleta');
+    console.log('Metadata completa recibida:', metadata);
     return res.status(400).json({ error: 'Metadata inválida' });
   }
 
@@ -53,23 +57,26 @@ export const handleStripeWebhook = async (req, res) => {
     return res.status(400).json({ error: 'ServiceId inválido' });
   }
 
-  // Resto del código igual...
-
   if (!BOOST_PLANS[planId]) {
     console.error('❌ Plan no válido:', planId);
     return res.status(400).json({ error: 'Plan no válido' });
   }
 
   try {
-    console.log('Actualizando servicio en BD...');
+    console.log('🔄 Actualizando servicio en BD...');
+    
+    // ✅ USAR LA DURACIÓN CORRECTA DEL PLAN
+    const promotionDuration = BOOST_PLANS[planId].duration;
+    const promotedUntil = new Date(Date.now() + promotionDuration);
+
     const updatedService = await ServiceModel.findByIdAndUpdate(
       serviceId,
       {
         isPromoted: true,
-        promotedUntil: new Date(Date.now() + BOOST_PLANS[planId]),
+        promotedUntil: promotedUntil,
         promotionPlan: planId
       },
-      { new: true }
+      { new: true, runValidators: true }
     );
     
     if (!updatedService) {
@@ -77,8 +84,15 @@ export const handleStripeWebhook = async (req, res) => {
       return res.status(404).json({ error: 'Servicio no encontrado' });
     }
     
-    console.log('✅ Servicio actualizado:', updatedService);
-    res.json({ received: true });
+    console.log('✅ Servicio actualizado exitosamente:', {
+      serviceId: updatedService._id,
+      isPromoted: updatedService.isPromoted,
+      promotedUntil: updatedService.promotedUntil,
+      promotionPlan: updatedService.promotionPlan
+    });
+    
+    res.json({ received: true, success: true });
+    
   } catch (dbError) {
     console.error('❌ Error de base de datos:', dbError);
     res.status(500).json({ 

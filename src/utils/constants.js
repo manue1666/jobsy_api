@@ -23,8 +23,18 @@ export const CATEGORIES = [
   "otros"
 ];
 
+
 export const BOOST_PLANS = {
-  "24h": { amount: 25, durationMs: 24 * 60 * 60 * 1000 },
-  "72h": { amount: 70, durationMs: 72 * 60 * 60 * 1000 },
-  "1week": { amount: 120, durationMs: 7 * 24 * 60 * 60 * 1000 },
+  '24h': { 
+    amount: 150,    // $1.50 en centavos
+    duration: 24 * 60 * 60 * 1000 // 24 horas en milisegundos
+  },
+  '72h': { 
+    amount: 350,    // $3.50
+    duration: 72 * 60 * 60 * 1000 // 72 horas
+  },
+  '1week': { 
+    amount: 600,    // $6.00
+    duration: 7 * 24 * 60 * 60 * 1000 // 1 semana
+  }
 };
