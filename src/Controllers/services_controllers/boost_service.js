@@ -39,7 +39,7 @@ export const boostService = [
       // ✅ CREAR PAYMENT INTENT CON CONFIGURACIÓN CORRECTA
       const paymentIntent = await stripe.paymentIntents.create({
         amount: selectedPlan.amount,
-        currency: "usd",
+        currency: "mxn",
         automatic_payment_methods: {
           enabled: true, // ✅ ESTO ES OBLIGATORIO
         },

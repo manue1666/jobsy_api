@@ -26,15 +26,15 @@ export const CATEGORIES = [
 
 export const BOOST_PLANS = {
   '24h': { 
-    amount: 150,    // $1.50 en centavos
+    amount: 3000,    // $30.00
     duration: 24 * 60 * 60 * 1000 // 24 horas en milisegundos
   },
   '72h': { 
-    amount: 350,    // $3.50
+    amount: 7000,    // $70.00
     duration: 72 * 60 * 60 * 1000 // 72 horas
   },
   '1week': { 
-    amount: 600,    // $6.00
+    amount: 12000,    // $120.00
     duration: 7 * 24 * 60 * 60 * 1000 // 1 semana
   }
 };
