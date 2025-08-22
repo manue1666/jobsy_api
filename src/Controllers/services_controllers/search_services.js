@@ -34,7 +34,7 @@ export const searchServices = [
         filter.category = category;
       }
 
-      //Filtro por autor
+      // Filtro por autor
       if (ownerId) {
         filter.user_id = ownerId;
       }
@@ -44,8 +44,15 @@ export const searchServices = [
       const limit = parseInt(req.query.limit) || 10;
       const skip = (page - 1) * limit;
 
-      // consulta a la base de datos
+      // 🔥 MODIFICACIÓN CLAVE: Ordenar por boost primero
+      const sortCriteria = { 
+        isPromoted: -1,   // Primero los promocionados (valor true = 1, false = 0, -1 = descendente)
+        createdAt: -1     // Luego por fecha de creación (más nuevos primero)
+      };
+
+      // consulta a la base de datos CON ORDENAMIENTO
       const services = await ServiceModel.find(filter)
+        .sort(sortCriteria)  // 👈 ¡Aquí está el cambio!
         .skip(skip)
         .limit(limit)
         .populate({

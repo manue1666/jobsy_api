@@ -84,13 +84,89 @@ const ServiceSchema = new Schema(
       enum: ["24h", "72h", "1week"],
       default: null,
     },
-
-    //imprime fecha de creacion y actualizacion
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+    // para campos virtuales
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
+  }
 );
+
+// calcula dinámicamente si está promocionado
+ServiceSchema.virtual("isCurrentlyPromoted").get(function () {
+  return (
+    this.isPromoted && this.promotedUntil && new Date() < this.promotedUntil
+  );
+});
+
+// actualiza isPromoted automáticamente antes de guardar
+ServiceSchema.pre("save", function (next) {
+  if (this.isModified("promotedUntil") || this.isModified("isPromoted")) {
+    if (this.promotedUntil && new Date() > this.promotedUntil) {
+      this.isPromoted = false;
+      this.promotionPlan = null;
+      this.promotedUntil = null;
+    }
+  }
+  next();
+});
+
+// actualiza isPromoted automáticamente antes de encontrar
+ServiceSchema.pre("find", function () {
+  this.where({
+    $or: [
+      { isPromoted: false },
+      { isPromoted: true, promotedUntil: { $gt: new Date() } },
+    ],
+  });
+});
+
+ServiceSchema.pre("findOne", function () {
+  this.where({
+    $or: [
+      { isPromoted: false },
+      { isPromoted: true, promotedUntil: { $gt: new Date() } },
+    ],
+  });
+});
+
+//  para limpieza periódica
+ServiceSchema.statics.cleanExpiredPromotions = async function () {
+  const result = await this.updateMany(
+    {
+      isPromoted: true,
+      promotedUntil: { $lt: new Date() },
+    },
+    {
+      $set: {
+        isPromoted: false,
+        promotionPlan: null,
+        promotedUntil: null,
+      },
+    }
+  );
+  return result;
+};
+
+// para verificar estado de promoción
+ServiceSchema.methods.checkPromotionStatus = function () {
+  if (this.promotedUntil && new Date() > this.promotedUntil) {
+    this.isPromoted = false;
+    this.promotionPlan = null;
+    this.promotedUntil = null;
+    return false;
+  }
+  return this.isPromoted;
+};
 
 ServiceSchema.index({ user_id: 1 }); // para busquedas mas rapidas
 ServiceSchema.index({ service_location: "2dsphere" }); // para geolocalizacion
+
+//para búsquedas de servicios promocionados activos
+ServiceSchema.index({
+  isPromoted: 1,
+  promotedUntil: 1,
+});
 
 export const ServiceModel = model("services", ServiceSchema);

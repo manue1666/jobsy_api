@@ -5,6 +5,7 @@ import { addFavoriteService, getFavoriteServices, removeFavoriteService } from "
 import { createService, deleteService, getServiceById, getUserServices, searchServices, searchServicesNearby, updateService } from "./Controllers/services_controllers/index.js";
 import { handleStripeWebhook } from "./utils/stripeWebHook.js";
 import { boostService } from "./Controllers/services_controllers/boost_service.js";
+import { startAllCronJobs } from "./utils/cron.js";
 
 
 //servidor
@@ -49,6 +50,8 @@ app.post('/service/boost/:id',boostService);
 app.post("/fav/post/:id", addFavoriteService)
 app.delete("/fav/delete/:id", removeFavoriteService)
 app.get("/fav/get", getFavoriteServices)
+
+startAllCronJobs();
 
 
 

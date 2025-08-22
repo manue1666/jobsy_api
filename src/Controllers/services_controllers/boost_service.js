@@ -17,7 +17,6 @@ export const boostService = [
 
       console.log('📦 Recibiendo boost request - ServiceId:', serviceId, 'PlanId:', planId);
 
-      // Validar que planId venga en el body
       if (!planId) {
         return res.status(400).json({ error: "Plan ID es requerido" });
       }
@@ -36,25 +35,30 @@ export const boostService = [
         return res.status(400).json({ error: "Plan no válido" });
       }
 
-      // ✅ CREAR PAYMENT INTENT CON CONFIGURACIÓN CORRECTA
+      // ✅ CREAR PAYMENT INTENT (sin capturar inmediatamente)
       const paymentIntent = await stripe.paymentIntents.create({
         amount: selectedPlan.amount,
         currency: "mxn",
-        automatic_payment_methods: {
-          enabled: true, // ✅ ESTO ES OBLIGATORIO
-        },
+        payment_method_types: ['card'],
         metadata: { 
-          serviceId: serviceId.toString(), // ✅ Asegurar que es string
+          serviceId: serviceId.toString(),
           planId: planId 
         },
+        // ⭐ IMPORTANTE: Dejar capture_method en 'automatic' (default)
+        // para que Stripe capture automáticamente cuando el pago sea exitoso
+        capture_method: 'automatic',
       });
 
       console.log(`✅ PaymentIntent creado - Service: ${serviceId}, Plan: ${planId}`);
       console.log(`💰 Amount: ${selectedPlan.amount}, Metadata:`, { serviceId, planId });
 
+      // ⭐ NO ACTUALIZAR BD AQUÍ - Esperar al webhook
+      
       res.json({ 
         clientSecret: paymentIntent.client_secret,
-        amount: selectedPlan.amount
+        amount: selectedPlan.amount,
+        paymentIntentId: paymentIntent.id,
+        status: 'requires_payment_method'
       });
 
     } catch (error) {
