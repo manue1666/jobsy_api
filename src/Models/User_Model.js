@@ -40,10 +40,14 @@ const UserSchema = new Schema({
             required: false
         }
     },
-    isVerified: {
+    isPremium: {
         type: Boolean,
         default: false
     },
+    premiumUntil: {
+        type: Date,
+        default: null
+    }
 }, { timestamps: true });
 
 //cifrar la contraseña antes de guardar

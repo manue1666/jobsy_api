@@ -1,11 +1,11 @@
 import express from "express"
 import cors from "cors";
-import { deleteUser, getAllUsers, getCurrentUserProfile, login, register, updateUser } from "./Controllers/User_Controller.js";
-import { addFavoriteService, getFavoriteServices, removeFavoriteService } from "./Controllers/FavService_Controller.js";
 import { createService, deleteService, getServiceById, getUserServices, searchServices, searchServicesNearby, updateService } from "./Controllers/services_controllers/index.js";
 import { handleStripeWebhook } from "./utils/stripeWebHook.js";
 import { boostService } from "./Controllers/services_controllers/boost_service.js";
 import { startAllCronJobs } from "./utils/cron.js";
+import { deleteUser, getAllUsers, getCurrentUserProfile, login, register, updateUser } from "./Controllers/user_controllers/index.js";
+import { addFavoriteService, getFavoriteServices, removeFavoriteService } from "./Controllers/fav_services_controller/index.js";
 
 
 //servidor
