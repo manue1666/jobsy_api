@@ -8,7 +8,20 @@ export const getCurrentUserProfile = [authenticateToken, async (req, res) => {
     try {
         const user_id = req.user.user_id;
 
-        //obtener información del usuario
+        // Contar servicios y favoritos
+        const serviceCount = await ServiceModel.countDocuments({ user_id });
+        const favoriteCount = await FavServiceModel.countDocuments({ user_id });
+
+        // Actualizar los campos en el usuario
+        await UserModel.findByIdAndUpdate(
+            user_id,
+            {
+                servicesCount: serviceCount,
+                favoritesCount: favoriteCount
+            }
+        );
+
+        // Obtener información del usuario actualizada
         const user = await UserModel.findById(user_id)
             .select('-password -__v')
             .lean();
@@ -19,16 +32,8 @@ export const getCurrentUserProfile = [authenticateToken, async (req, res) => {
             });
         }
 
-        // obtener estadísticas (opcional)
-        const serviceCount = await ServiceModel.countDocuments({ user_id });
-        const favoriteCount = await FavServiceModel.countDocuments({ user_id });
-
         res.status(200).json({
-            user,
-            stats: {
-                services: serviceCount,
-                favorites: favoriteCount
-            }
+            user
         });
 
     } catch (error) {

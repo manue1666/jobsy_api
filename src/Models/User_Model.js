@@ -40,6 +40,14 @@ const UserSchema = new Schema({
             required: false
         }
     },
+    servicesCount:{
+        type: Number,
+        default: 0
+    },
+    favoritesCount:{
+        type: Number,
+        default: 0
+    },
     isPremium: {
         type: Boolean,
         default: false

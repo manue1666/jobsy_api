@@ -1,19 +1,66 @@
-
 import { authenticateToken } from "../../utils/authMiddleware.js";
 import multer from "multer";
 import { uploadMultipleImages } from "../../utils/imageService.js";
 import { geocodeAddress } from "../../utils/geocoder.js";
 import { ServiceModel } from "../../Models/Service_Model.js";
+import { UserModel } from "../../Models/User_Model.js"; // Importar UserModel
 
-
-export const uploadServiceImages = multer({
-  dest: "tmp/uploads/services",
-  limits: { fileSize: 10 * 1024 * 1024, files: 5 }, // 10MB c/u, máximo 5 imágenes
-}).array("serviceImages", 5); // 'serviceImages' debe coincidir con el FormData
 
 export const createService = [
   authenticateToken,
-  uploadServiceImages,
+  async (req, res, next) => {
+    try {
+      // Obtener usuario
+      const user = await UserModel.findById(req.user.user_id).lean();
+      if (!user) {
+        return res.status(404).json({ error: "Usuario no encontrado" });
+      }
+
+      // Contar servicios existentes del usuario
+      const userServicesCount = await ServiceModel.countDocuments({ user_id: req.user.user_id });
+
+      // Validaciones según premium
+      if (!user.isPremium) {
+        if (userServicesCount >= 1) {
+          return res.status(403).json({ error: "Los usuarios no premium solo pueden publicar 1 servicio." });
+        }
+        // Limitar multer a 1 imagen
+        const upload = multer({
+          dest: "tmp/uploads/services",
+          limits: { fileSize: 10 * 1024 * 1024, files: 1 },
+        }).array("serviceImages", 1);
+        upload(req, res, function (err) {
+          if (err) {
+            return res.status(400).json({ error: "Error al subir imagen: " + err.message });
+          }
+          if (req.files && req.files.length > 1) {
+            return res.status(400).json({ error: "Solo puedes subir 1 imagen por servicio." });
+          }
+          next();
+        });
+      } else {
+        if (userServicesCount >= 5) {
+          return res.status(403).json({ error: "Los usuarios premium solo pueden publicar hasta 5 servicios." });
+        }
+        // Limitar multer a 9 imágenes
+        const upload = multer({
+          dest: "tmp/uploads/services",
+          limits: { fileSize: 10 * 1024 * 1024, files: 9 },
+        }).array("serviceImages", 9);
+        upload(req, res, function (err) {
+          if (err) {
+            return res.status(400).json({ error: "Error al subir imágenes: " + err.message });
+          }
+          if (req.files && req.files.length > 9) {
+            return res.status(400).json({ error: "Solo puedes subir hasta 9 imágenes por servicio." });
+          }
+          next();
+        });
+      }
+    } catch (error) {
+      return res.status(500).json({ error: "Error al validar usuario/servicios", details: error.message });
+    }
+  },
   async (req, res) => {
     try {
       const {
