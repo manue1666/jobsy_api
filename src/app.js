@@ -6,6 +6,7 @@ import { boostService } from "./Controllers/services_controllers/boost_service.j
 import { startAllCronJobs } from "./utils/cron.js";
 import { deleteUser, getAllUsers, getCurrentUserProfile, login, register, updateUser } from "./Controllers/user_controllers/index.js";
 import { addFavoriteService, getFavoriteServices, removeFavoriteService } from "./Controllers/fav_services_controller/index.js";
+import { premiumUser } from "./Controllers/user_controllers/premium_user.js";
 
 
 //servidor
@@ -35,6 +36,7 @@ app.post("/user/login", login)
 app.patch("/user/patch/:id", updateUser)
 app.delete("/user/delete/:id", deleteUser)
 app.get("/user/me", getCurrentUserProfile)
+app.post("/user/premium", premiumUser)
 
 //service endpoints
 app.post("/service/post", createService)
