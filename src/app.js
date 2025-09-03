@@ -8,6 +8,7 @@ import { deleteUser, getAllUsers, getCurrentUserProfile, login, register, update
 import { addFavoriteService, getFavoriteServices, removeFavoriteService } from "./Controllers/fav_services_controller/index.js";
 import { premiumUser } from "./Controllers/user_controllers/premium_user.js";
 import { addComment, deleteComment, getCommentsByService } from "./Controllers/comments_controller/index.js";
+import { sendEmail } from "./Controllers/emailController/email.js";
 //import {sendEmail} from "./Controllers/emailController/email.js";
 
 
@@ -62,7 +63,7 @@ app.get("/comments/:id", getCommentsByService);
 app.delete("/comment/delete/:id", deleteComment);
 
 //Email endpoint
-//app.post("/email/post", sendEmail)
+app.post("/email/post", sendEmail)
 
 startAllCronJobs();
 
