@@ -7,7 +7,9 @@ import { startAllCronJobs } from "./utils/cron.js";
 import { deleteUser, getAllUsers, getCurrentUserProfile, login, register, updateUser } from "./Controllers/user_controllers/index.js";
 import { addFavoriteService, getFavoriteServices, removeFavoriteService } from "./Controllers/fav_services_controller/index.js";
 import { premiumUser } from "./Controllers/user_controllers/premium_user.js";
-import {sendEmail} from "./Controllers/emailController/email.js";
+import { addComment, deleteComment, getCommentsByService } from "./Controllers/comments_controller/index.js";
+//import {sendEmail} from "./Controllers/emailController/email.js";
+
 
 
 //servidor
@@ -54,8 +56,13 @@ app.post("/fav/post/:id", addFavoriteService)
 app.delete("/fav/delete/:id", removeFavoriteService)
 app.get("/fav/get", getFavoriteServices)
 
+//Comment endpoints
+app.post("/comment/post/:id", addComment)
+app.get("/comments/:id", getCommentsByService);
+app.delete("/comment/delete/:id", deleteComment);
+
 //Email endpoint
-app.post("/email/post", sendEmail)
+//app.post("/email/post", sendEmail)
 
 startAllCronJobs();
 
