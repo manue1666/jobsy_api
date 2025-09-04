@@ -84,6 +84,10 @@ const ServiceSchema = new Schema(
       enum: ["24h", "72h", "1week"],
       default: null,
     },
+    favoritesCount: {
+      type: Number,
+      default: 0,
+    }
   },
   {
     timestamps: true,

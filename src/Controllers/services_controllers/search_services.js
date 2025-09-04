@@ -52,7 +52,7 @@ export const searchServices = [
 
       // consulta a la base de datos CON ORDENAMIENTO
       const services = await ServiceModel.find(filter)
-        .sort(sortCriteria)  // 👈 ¡Aquí está el cambio!
+        .sort(sortCriteria)
         .skip(skip)
         .limit(limit)
         .populate({
@@ -70,10 +70,32 @@ export const searchServices = [
         fav.service_id.toString()
       );
 
+      // 🔥 Nuevo: contar favoritos (likes) para cada servicio y actualizar el campo favoritesCount
+      const serviceIds = services.map(s => s._id);
+      const favCounts = await FavServiceModel.aggregate([
+        { $match: { service_id: { $in: serviceIds } } },
+        { $group: { _id: "$service_id", count: { $sum: 1 } } }
+      ]);
+      const favCountMap = {};
+      favCounts.forEach(fc => {
+        favCountMap[fc._id.toString()] = fc.count;
+      });
+
+      // Actualizar el campo favoritesCount en cada servicio (en la base de datos)
+      await Promise.all(
+        services.map(service =>
+          ServiceModel.findByIdAndUpdate(
+            service._id,
+            { favoritesCount: favCountMap[service._id.toString()] || 0 }
+          )
+        )
+      );
+
       const servicesWithFavorites = services.map((service) => ({
         ...service,
         isFavorite: favoriteIds.includes(service._id.toString()),
-        user: service.user_id, // Mover la info de usuario a un campo 'user'
+        favoritesCount: favCountMap[service._id.toString()] || 0, // incluir el conteo actualizado
+        user: service.user_id,
       }));
 
       // eliminar el campo user_id ya que se movio a 'user'
