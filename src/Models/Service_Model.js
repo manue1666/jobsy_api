@@ -116,24 +116,6 @@ ServiceSchema.pre("save", function (next) {
   next();
 });
 
-// actualiza isPromoted automáticamente antes de encontrar
-ServiceSchema.pre("find", function () {
-  this.where({
-    $or: [
-      { isPromoted: false },
-      { isPromoted: true, promotedUntil: { $gt: new Date() } },
-    ],
-  });
-});
-
-ServiceSchema.pre("findOne", function () {
-  this.where({
-    $or: [
-      { isPromoted: false },
-      { isPromoted: true, promotedUntil: { $gt: new Date() } },
-    ],
-  });
-});
 
 //  para limpieza periódica
 ServiceSchema.statics.cleanExpiredPromotions = async function () {

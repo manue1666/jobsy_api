@@ -31,9 +31,8 @@ export const searchServicesNearby = [
         { new: true }
       );
 
-      // 3. Buscar servicios cercanos
+      // Buscar servicios cercanos
       const maxDistance = req.query.maxDistance || 10000; // 10km por defecto
-
       const services = await ServiceModel.find({
         service_location: {
           $near: {
@@ -48,19 +47,26 @@ export const searchServicesNearby = [
         .populate("user_id", "name profilePhoto")
         .lean();
 
-      // Verificar favoritos
+      // Verificar favoritos y contar favoritos
+      const serviceIds = services.map((s) => s._id);
+      const favCounts = await FavServiceModel.aggregate([
+        { $match: { service_id: { $in: serviceIds } } },
+        { $group: { _id: "$service_id", count: { $sum: 1 } } },
+      ]);
+      const favCountMap = {};
+      favCounts.forEach((fc) => {
+        favCountMap[fc._id.toString()] = fc.count;
+      });
       const favoriteServices = await FavServiceModel.find({
         user_id: req.user._id,
       });
-      const favoriteIds = favoriteServices.map((fav) =>
-        fav.service_id.toString()
-      );
+      const favoriteIds = favoriteServices.map((fav) => fav.service_id.toString());
 
       const formattedServices = services.map((service) => ({
         ...service,
+        favoritesCount: favCountMap[service._id.toString()] || 0,
         isFavorite: favoriteIds.includes(service._id.toString()),
         user: service.user_id, // Mover user_id a user
-        // Eliminar user_id para mantener consistencia
         user_id: undefined,
       }));
 
