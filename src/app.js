@@ -9,6 +9,7 @@ import { addFavoriteService, getFavoriteServices, removeFavoriteService } from "
 import { premiumUser } from "./Controllers/user_controllers/premium_user.js";
 import { addComment, deleteComment, getCommentsByService } from "./Controllers/comments_controller/index.js";
 import { sendEmail } from "./Controllers/emailController/email.js";
+import { updatePasswordUser } from "./Controllers/user_controllers/update_password_user.js";
 //import {sendEmail} from "./Controllers/emailController/email.js";
 
 
@@ -41,6 +42,7 @@ app.patch("/user/patch/:id", updateUser)
 app.delete("/user/delete/:id", deleteUser)
 app.get("/user/me", getCurrentUserProfile)
 app.post("/user/premium", premiumUser)
+app.patch("/user/password", updatePasswordUser);
 
 //service endpoints
 app.post("/service/post", createService)
