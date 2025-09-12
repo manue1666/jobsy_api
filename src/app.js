@@ -10,6 +10,7 @@ import { premiumUser } from "./Controllers/user_controllers/premium_user.js";
 import { addComment, deleteComment, getCommentsByService } from "./Controllers/comments_controller/index.js";
 import { sendEmail } from "./Controllers/emailController/email.js";
 import { updatePasswordUser } from "./Controllers/user_controllers/update_password_user.js";
+import { recoverPassword } from "./Controllers/emailController/recover_password.js";
 //import {sendEmail} from "./Controllers/emailController/email.js";
 
 
@@ -66,6 +67,7 @@ app.delete("/comment/delete/:id", deleteComment);
 
 //Email endpoint
 app.post("/email/post", sendEmail)
+app.post("/email/recover", recoverPassword);
 
 startAllCronJobs();
 

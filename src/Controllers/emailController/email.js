@@ -1,22 +1,25 @@
-import nodemailer from 'nodemailer';
+import nodemailer from "nodemailer";
 import { UserModel } from "../../Models/User_Model.js"; // Importar UserModel
 import { authenticateToken } from "../../utils/authMiddleware.js";
 
 export const sendEmail = [
-    authenticateToken, async (req, res, next)=>{
-        //Obtener usuario
-        const user = await UserModel.findById(req.user.user_id).lean();
-        if(!user){return res.status(404).json({error : "Usuario no encontrado"})};
+  authenticateToken,
+  async (req, res, next) => {
+    //Obtener usuario
+    const user = await UserModel.findById(req.user.user_id).lean();
+    if (!user) {
+      return res.status(404).json({ error: "Usuario no encontrado" });
+    }
 
-        let email = user.email;
+    let email = user.email;
 
-// Obtener la fecha actual
-const date = new Date();
+    // Obtener la fecha actual
+    const date = new Date();
 
-// Convertir a formato ISO (YYYY-MM-DD)
-const localDate = date.toISOString().split("T")[0];
+    // Convertir a formato ISO (YYYY-MM-DD)
+    const localDate = date.toISOString().split("T")[0];
 
-        const mensaje = `
+    const mensaje = `
 ¡Gracias por unirte a Premium, ${user.name}!
 
 Nos complace darte la bienvenida a la experiencia Premium.
@@ -34,26 +37,25 @@ Beneficios: publica hasta ${process.env.count_services} servicios, sube hasta ${
 
 ATT: TEAM JOBSY | TETEOCAN
 `;
-        try{
-            let transporter = nodemailer.createTransport({
-                service : "gmail",
-                auth : {
-                    user : process.env.correo_electronico, //Correo electronico de la empresa -> Jobsy
-                    pass : process.env.contrasenia_aplicacion_google //Contraseña de aplicación de la empresa -> Jobsy
-                }
-            });
+    try {
+      let transporter = nodemailer.createTransport({
+        service: "gmail",
+        auth: {
+          user: process.env.correo_electronico, //Correo electronico de la empresa -> Jobsy
+          pass: process.env.contrasenia_aplicacion_google, //Contraseña de aplicación de la empresa -> Jobsy
+        },
+      });
 
-            await transporter.sendMail({
-                from : process.env.correo_electronico,
-                to: email,
-                subject : "TE UNISTE A PREMIUM!!",
-                text : mensaje
-            });
+      await transporter.sendMail({
+        from: process.env.correo_electronico,
+        to: email,
+        subject: "TE UNISTE A PREMIUM!!",
+        text: mensaje,
+      });
 
-            res.json({ok:true, msg: "Correo enviado correctamente"});
-        }catch(err){
-            res.status(500).json({ok:false, msg:err.message});
-        }
-
+      res.json({ ok: true, msg: "Correo enviado correctamente" });
+    } catch (err) {
+      res.status(500).json({ ok: false, msg: err.message });
     }
-]
+  },
+];
