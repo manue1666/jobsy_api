@@ -65,6 +65,22 @@ UserSchema.pre('save', async function(next) {
   next();
 });
 
+UserSchema.statics.cleanExpiredPremium = async function () {
+  const result = await this.updateMany(
+    {
+      isPremium: true,
+      premiumUntil: { $lt: new Date() },
+    },
+    {
+      $set: {
+        isPremium: false,
+        premiumUntil: null,
+      },
+    }
+  );
+  return result;
+};
+
 //comparar contraseñas
 UserSchema.methods.comparePassword = async function(candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);
