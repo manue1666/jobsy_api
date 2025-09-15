@@ -20,22 +20,30 @@ export const sendEmail = [
     const localDate = date.toISOString().split("T")[0];
 
     const mensaje = `
-¡Gracias por unirte a Premium, ${user.name}!
+  <div style="font-family: Arial, sans-serif; background: #f4f8fb; padding: 32px;">
+    <div style="max-width: 500px; margin: auto; background: #fff; border-radius: 12px; box-shadow: 0 2px 8px rgba(26,35,126,0.08); overflow: hidden;">
+      <div style="background: #1a237e; color: #fff; padding: 24px 0; text-align: center;">
+        <h2 style="margin: 0; font-size: 2em; letter-spacing: 1px;">¡Gracias por unirte a Premium, ${user.name}!</h2>
+      </div>
+      <div style="padding: 24px; color: #333;">
+        <p>Hola <strong>${user.name}</strong>,</p>
+        <p>Nos complace darte la bienvenida a la experiencia Premium en <span style="color: #00bfae; font-weight: bold;">Jobsy</span>.</p>
+        <div style="background: #e0f7fa; border-left: 6px solid #00bfae; padding: 16px; margin: 24px 0; border-radius: 8px;">
+          <p style="margin: 0; font-size: 1.1em; color: #1a237e;">📌 Detalles de tu suscripción:</p>
+          <p style="margin: 0; font-size: 1.4em; color: #00bfae; font-weight: bold; letter-spacing: 2px;">- Nombre: ${user.name}</p>
+          <p style="margin: 0; font-size: 1.4em; color: #00bfae; font-weight: bold; letter-spacing: 2px;">- Correo: ${email}</p>
+          <p style="margin: 0; font-size: 1.4em; color: #00bfae; font-weight: bold; letter-spacing: 2px;">- Fecha de contratación: ${localDate}</p>
+          <p style="margin: 0; font-size: 1.4em; color: #00bfae; font-weight: bold; letter-spacing: 2px;">- Precio: ${process.env.price_premium} ${process.env.type_currency}</p>
 
-Nos complace darte la bienvenida a la experiencia Premium.
-
-📌 Detalles de tu suscripción:
-- Nombre: ${user.name}
-- Correo: ${email}
-- Fecha de contratación: ${localDate}
-- Precio: ${process.env.price_premium} ${process.env.type_currency}
-
-⭐ Plan mensual Premium  
-💰 Precio: ${process.env.price_premium} ${process.env.type_currency} / mes  
-Beneficios: publica hasta ${process.env.count_services} servicios, sube hasta ${process.env.count_imgs} imágenes por servicio y edita tus servicios publicados.
-
-
-ATT: TEAM JOBSY | TETEOCAN
+          </div>
+        <p>⭐ Plan mensual Premium  💰$<span style="color: #1a237e; font-weight: bold;">${process.env.price_premium} ${process.env.type_currency} / mes  </p>
+        <p style="color: #1a237e;">⭐Beneficios: publica hasta ${process.env.count_services} servicios, sube hasta ${process.env.count_imgs} imágenes por servicio y edita tus servicios publicados.</p>
+      </div>
+      <div style="background: #00bfae; color: #fff; text-align: center; padding: 16px 0; border-bottom-left-radius: 12px; border-bottom-right-radius: 12px;">
+        <strong>TEAM JOBSY | TETEOCAN</strong>
+      </div>
+    </div>
+  </div>
 `;
     try {
       let transporter = nodemailer.createTransport({
