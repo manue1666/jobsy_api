@@ -33,11 +33,11 @@ export const sendEmail = [
           <p style="margin: 0; font-size: 1.4em; color: #00bfae; font-weight: bold; letter-spacing: 2px;">- Nombre: ${user.name}</p>
           <p style="margin: 0; font-size: 1.4em; color: #00bfae; font-weight: bold; letter-spacing: 2px;">- Correo: ${email}</p>
           <p style="margin: 0; font-size: 1.4em; color: #00bfae; font-weight: bold; letter-spacing: 2px;">- Fecha de contratación: ${localDate}</p>
-          <p style="margin: 0; font-size: 1.4em; color: #00bfae; font-weight: bold; letter-spacing: 2px;">- Precio: ${process.env.price_premium} ${process.env.type_currency}</p>
+          <p style="margin: 0; font-size: 1.4em; color: #00bfae; font-weight: bold; letter-spacing: 2px;">- Precio: 99.00 MXN</p>
 
           </div>
-        <p>⭐ Plan mensual Premium  💰$<span style="color: #1a237e; font-weight: bold;">${process.env.price_premium} ${process.env.type_currency} / mes  </p>
-        <p style="color: #1a237e;">⭐Beneficios: publica hasta ${process.env.count_services} servicios, sube hasta ${process.env.count_imgs} imágenes por servicio y edita tus servicios publicados.</p>
+        <p>⭐ Plan mensual Premium  💰$<span style="color: #1a237e; font-weight: bold;">99.00 MXN / mes  </p>
+        <p style="color: #1a237e;">⭐Beneficios: publica hasta 5 servicios, sube hasta 9 imágenes por servicio y edita tus servicios publicados.</p>
       </div>
       <div style="background: #00bfae; color: #fff; text-align: center; padding: 16px 0; border-bottom-left-radius: 12px; border-bottom-right-radius: 12px;">
         <strong>TEAM JOBSY | TETEOCAN</strong>
