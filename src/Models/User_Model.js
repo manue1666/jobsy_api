@@ -1,66 +1,75 @@
 import { model, Schema } from "mongoose";
-import bcrypt from "bcrypt"
+import bcrypt from "bcrypt";
 
-
-const UserSchema = new Schema({
+const UserSchema = new Schema(
+  {
     name: {
-        type: String,
-        required: true
+      type: String,
+      required: true,
     },
     email: {
-        type: String,
-        required: true,
-        unique: true
+      type: String,
+      required: true,
+      unique: true,
     },
     password: {
-        type: String,
-        required: true
+      type: String,
+      required: true,
     },
     profilePhoto: {
-        type: String
+      type: String,
     },
     user_location: {
-        type: {
-            type: String,
-            default: "Point",
-            enum: ["Point"], 
-            required: false
+      type: {
+        type: String,
+        default: "Point",
+        enum: ["Point"],
+        required: false,
+      },
+      coordinates: {
+        type: [Number],
+        default: [0, 0],
+        validate: {
+          validator: function (v) {
+            return (
+              v.length === 2 &&
+              typeof v[0] === "number" &&
+              typeof v[1] === "number"
+            );
+          },
+          message: (props) =>
+            `${props.value} no es un conjunto de coordenadas válido [longitud, latitud]`,
         },
-        coordinates: {
-            type: [Number],
-            default: [0, 0], 
-            validate: {
-                validator: function(v) {
-                    return v.length === 2 && 
-                           typeof v[0] === 'number' && 
-                           typeof v[1] === 'number';
-                },
-                message: props => `${props.value} no es un conjunto de coordenadas válido [longitud, latitud]`
-            },
-            required: false
-        }
+        required: false,
+      },
     },
-    servicesCount:{
-        type: Number,
-        default: 0
+    servicesCount: {
+      type: Number,
+      default: 0,
     },
-    favoritesCount:{
-        type: Number,
-        default: 0
+    favoritesCount: {
+      type: Number,
+      default: 0,
     },
     isPremium: {
-        type: Boolean,
-        default: false
+      type: Boolean,
+      default: false,
+    },
+    stripeCustomerId: {
+      type: String,
+      default: null,
     },
     premiumUntil: {
-        type: Date,
-        default: null
-    }
-}, { timestamps: true });
+      type: Date,
+      default: null,
+    },
+  },
+  { timestamps: true }
+);
 
 //cifrar la contraseña antes de guardar
-UserSchema.pre('save', async function(next) {
-  if (!this.isModified('password')) return next();
+UserSchema.pre("save", async function (next) {
+  if (!this.isModified("password")) return next();
   this.password = await bcrypt.hash(this.password, 10);
   next();
 });
@@ -82,9 +91,8 @@ UserSchema.statics.cleanExpiredPremium = async function () {
 };
 
 //comparar contraseñas
-UserSchema.methods.comparePassword = async function(candidatePassword) {
+UserSchema.methods.comparePassword = async function (candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);
 };
-
 
 export const UserModel = model("users", UserSchema);

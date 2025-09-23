@@ -6,13 +6,13 @@ import { boostService } from "./Controllers/services_controllers/boost_service.j
 import { startAllCronJobs } from "./utils/cron.js";
 import { deleteUser, getAllUsers, getCurrentUserProfile, login, register, updateUser } from "./Controllers/user_controllers/index.js";
 import { addFavoriteService, getFavoriteServices, removeFavoriteService } from "./Controllers/fav_services_controller/index.js";
-import { premiumUser } from "./Controllers/user_controllers/premium_user.js";
+import { createPremiumSetupIntent, premiumUser } from "./Controllers/user_controllers/premium_user.js";
+import { cancelPremium } from "./Controllers/user_controllers/cancel_premium.js";
+import { statusPremium } from "./Controllers/user_controllers/status_premium.js";
 import { addComment, deleteComment, getCommentsByService } from "./Controllers/comments_controller/index.js";
 import { sendEmail } from "./Controllers/emailController/email.js";
 import { updatePasswordUser } from "./Controllers/user_controllers/update_password_user.js";
 import { recoverPassword } from "./Controllers/emailController/recover_password.js";
-//import {sendEmail} from "./Controllers/emailController/email.js";
-
 
 
 //servidor
@@ -43,6 +43,9 @@ app.patch("/user/patch/:id", updateUser)
 app.delete("/user/delete/:id", deleteUser)
 app.get("/user/me", getCurrentUserProfile)
 app.post("/user/premium", premiumUser)
+app.post("/user/premium/setup-intent", createPremiumSetupIntent);
+app.post("/user/premium/cancel", cancelPremium);
+app.get("/user/premium/status", statusPremium);
 app.patch("/user/password", updatePasswordUser);
 
 //service endpoints
