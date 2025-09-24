@@ -73,55 +73,76 @@ export const createService = [
         tipo,
       } = req.body;
 
+      // Validaciones explícitas de campos requeridos
+      if (!service_name || typeof service_name !== "string" || service_name.trim().length < 3) {
+        return res.status(400).json({ error: "El nombre del servicio es requerido y debe tener al menos 3 caracteres." });
+      }
+      if (!category || typeof category !== "string") {
+        return res.status(400).json({ error: "La categoría es requerida." });
+      }
+      if (!description || typeof description !== "string" || description.trim().length < 10) {
+        return res.status(400).json({ error: "La descripción es requerida y debe tener al menos 10 caracteres." });
+      }
+      if (!phone || typeof phone !== "string" || !/^\+?\d{7,15}$/.test(phone)) {
+        return res.status(400).json({ error: "El número de teléfono es requerido y debe tener entre 7 y 15 dígitos." });
+      }
+      if (!email || typeof email !== "string" || !/^\S+@\S+\.\S+$/.test(email)) {
+        return res.status(400).json({ error: "El correo electrónico es requerido y debe tener formato válido." });
+      }
+      if (!address || typeof address !== "string" || address.trim().length < 5) {
+        return res.status(400).json({ error: "La dirección es requerida y debe tener al menos 5 caracteres." });
+      }
+
+      // Verificar duplicidad de teléfono
+      const phoneExists = await ServiceModel.findOne({ phone });
+      if (phoneExists) {
+        return res.status(409).json({ error: "El número de teléfono ya está registrado en otro servicio." });
+      }
+
       // 1. Procesamiento universal del campo 'tipo'
       let tipoArray = [];
       try {
         if (typeof tipo === "string") {
-          // Caso 1: String JSON (desde frontend) -> "[\"domicilio\",\"comercio\"]"
           if (tipo.startsWith("[")) {
             tipoArray = JSON.parse(tipo);
-          }
-          // Caso 2: String plano (desde Postman/form-data) -> "domicilio,comercio"
-          else {
+          } else {
             tipoArray = tipo
               .split(",")
               .map((item) => item.trim().replace(/["']/g, ""));
           }
-        }
-        // Caso 3: Array directo (desde Postman/raw JSON)
-        else if (Array.isArray(tipo)) {
+        } else if (Array.isArray(tipo)) {
           tipoArray = tipo;
         }
       } catch (e) {
-        console.warn("Error al procesar campo 'tipo':", e.message);
+        return res.status(400).json({ error: "El campo 'tipo' tiene un formato inválido." });
       }
 
       // 2. Validación de tipos
       const validTypes = ["domicilio", "comercio"];
       tipoArray = tipoArray.filter((t) => validTypes.includes(t));
       if (tipoArray.length === 0) {
-        tipoArray = []; // Valor por defecto si no hay tipos válidos
+        tipoArray = [];
       }
 
       // 3. Geocodificación
-      if (!address) {
-        return res.status(400).json({ error: "La dirección es requerida" });
-      }
-
       const coordinates = await geocodeAddress(address);
       if (!coordinates) {
         return res.status(400).json({
-          error: "No se pudo determinar la ubicación. Verifica la dirección.",
+          error: "No se pudo determinar la ubicación. Verifica la dirección proporcionada.",
         });
       }
 
       // 4. Procesamiento de imágenes
       let photos = [];
       if (req.files?.length > 0) {
-        photos = await uploadMultipleImages(
-          req.files.map((file) => file.path),
-          "marketplace/services"
-        );
+        try {
+          photos = await uploadMultipleImages(
+            req.files.map((file) => file.path),
+            "marketplace/services"
+          );
+        } catch (imgErr) {
+          return res.status(400).json({ error: "Error al procesar las imágenes: " + imgErr.message });
+        }
       }
 
       // 5. Creación del servicio

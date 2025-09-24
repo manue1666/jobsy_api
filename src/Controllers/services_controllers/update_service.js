@@ -38,6 +38,43 @@ export const updateService = [
       ];
       const updates = Object.keys(updateData).filter(u => allowedUpdates.includes(u));
 
+      // Validaciones explícitas de campos
+      if (updateData.service_name !== undefined) {
+        if (!updateData.service_name || typeof updateData.service_name !== "string" || updateData.service_name.trim().length < 3) {
+          return res.status(400).json({ error: "El nombre del servicio es requerido y debe tener al menos 3 caracteres." });
+        }
+      }
+      if (updateData.category !== undefined) {
+        if (!updateData.category || typeof updateData.category !== "string") {
+          return res.status(400).json({ error: "La categoría es requerida." });
+        }
+      }
+      if (updateData.description !== undefined) {
+        if (!updateData.description || typeof updateData.description !== "string" || updateData.description.trim().length < 10) {
+          return res.status(400).json({ error: "La descripción es requerida y debe tener al menos 10 caracteres." });
+        }
+      }
+      if (updateData.phone !== undefined) {
+        if (!updateData.phone || typeof updateData.phone !== "string" || !/^\+?\d{7,15}$/.test(updateData.phone)) {
+          return res.status(400).json({ error: "El número de teléfono es requerido y debe tener entre 7 y 15 dígitos." });
+        }
+        // Verificar duplicidad de teléfono
+        const phoneExists = await ServiceModel.findOne({ phone: updateData.phone, _id: { $ne: id } });
+        if (phoneExists) {
+          return res.status(409).json({ error: "El número de teléfono ya está registrado en otro servicio." });
+        }
+      }
+      if (updateData.email !== undefined) {
+        if (!updateData.email || typeof updateData.email !== "string" || !/^\S+@\S+\.\S+$/.test(updateData.email)) {
+          return res.status(400).json({ error: "El correo electrónico es requerido y debe tener formato válido." });
+        }
+      }
+      if (updateData.address !== undefined) {
+        if (!updateData.address || typeof updateData.address !== "string" || updateData.address.trim().length < 5) {
+          return res.status(400).json({ error: "La dirección es requerida y debe tener al menos 5 caracteres." });
+        }
+      }
+
       // Procesar campo 'tipo'
       if (updateData.tipo) {
         let tipoArray = [];
@@ -58,7 +95,7 @@ export const updateService = [
           tipoArray = tipoArray.filter(t => validTypes.includes(t));
           service.tipo = tipoArray.length > 0 ? tipoArray : [];
         } catch (e) {
-          console.warn("Error al procesar campo 'tipo':", e.message);
+          return res.status(400).json({ error: "El campo 'tipo' tiene un formato inválido." });
         }
         delete updateData.tipo;
       }
@@ -91,10 +128,14 @@ export const updateService = [
 
       let newPhotos = [];
       if (req.files?.length > 0) {
-        newPhotos = await uploadMultipleImages(
-          req.files.map(file => file.path),
-          "marketplace/services"
-        );
+        try {
+          newPhotos = await uploadMultipleImages(
+            req.files.map(file => file.path),
+            "marketplace/services"
+          );
+        } catch (imgErr) {
+          return res.status(400).json({ error: "Error al procesar las imágenes: " + imgErr.message });
+        }
       }
 
       service.photos = [...existingPhotos, ...newPhotos];

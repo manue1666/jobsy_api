@@ -75,10 +75,12 @@ UserSchema.pre("save", async function (next) {
 });
 
 UserSchema.statics.cleanExpiredPremium = async function () {
+  // Solo limpia si premiumUntil expiró hace más de 1 día
+  const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
   const result = await this.updateMany(
     {
       isPremium: true,
-      premiumUntil: { $lt: new Date() },
+      premiumUntil: { $lt: oneDayAgo },
     },
     {
       $set: {
