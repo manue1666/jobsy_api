@@ -1,4 +1,4 @@
-import nodemailer from "nodemailer";
+import { Resend } from 'resend';
 import { UserModel } from "../../Models/User_Model.js"; // Importar UserModel
 import { authenticateToken } from "../../utils/authMiddleware.js";
 
@@ -15,7 +15,6 @@ export const sendEmail = [
 
     // Obtener la fecha actual
     const date = new Date();
-
     // Convertir a formato ISO (YYYY-MM-DD)
     const localDate = date.toISOString().split("T")[0];
 
@@ -30,10 +29,10 @@ export const sendEmail = [
         <p>Nos complace darte la bienvenida a la experiencia <span style="color: #ffd600; font-weight: bold;">Premium</span> en <span style="color: #00bfae; font-weight: bold;">Jobsy</span>.</p>
         <div style="background: #e0f7fa; border-left: 6px solid #00bfae; padding: 16px; margin: 24px 0; border-radius: 8px;">
           <p style="margin: 0; font-size: 1.1em; color: #1a237e;">📌 Detalles de tu suscripción:</p>
-          <p style="margin: 0; font-size: 1.4em; color: #00bfae; font-weight: bold; letter-spacing: 2px;">- Nombre: ${user.name}</p>
-          <p style="margin: 0; font-size: 1.4em; color: #00bfae; font-weight: bold; letter-spacing: 2px;">- Correo: ${email}</p>
-          <p style="margin: 0; font-size: 1.4em; color: #ffd600; font-weight: bold; letter-spacing: 2px;">- Fecha de contratación: ${localDate}</p>
-          <p style="margin: 0; font-size: 1.4em; color: #ffd600; font-weight: bold; letter-spacing: 2px;">- Precio: 99.00 MXN</p>
+          <p style="margin: 0; font-size: 1.4em; font-weight: bold; letter-spacing: 2px;"><span style='color:#00bfae;'>Nombre:</span> ${user.name}</p>
+          <p style="margin: 0; font-size: 1.4em; font-weight: bold; letter-spacing: 2px;"><span style='color:#00bfae;'>Correo:</span> ${email}</p>
+          <p style="margin: 0; font-size: 1.4em; font-weight: bold; letter-spacing: 2px;"><span style='color:#00bfae;'>Fecha de contratación:</span> ${localDate}</p>
+          <p style="margin: 0; font-size: 1.4em; font-weight: bold; letter-spacing: 2px;"><span style='color:#00bfae;'>Precio:</span> 99.00 MXN</p>
         </div>
         <p style="color: #1a237e; background: #fffde7; border-left: 6px solid #ffd600; padding: 12px; border-radius: 6px; font-weight: bold;">⭐ Plan mensual <span style='color:#ffd600;'>Premium</span>  💰$<span style="color: #1a237e; font-weight: bold;">99.00 MXN / mes</span></p>
         <p style="color: #1a237e;">⭐Beneficios: publica hasta 5 servicios, sube hasta 9 imágenes por servicio y edita tus servicios publicados.</p>
@@ -53,21 +52,13 @@ export const sendEmail = [
   </div>
 `;
     try {
-      let transporter = nodemailer.createTransport({
-        service: "gmail",
-        auth: {
-          user: process.env.correo_electronico, //Correo electronico de la empresa -> Jobsy
-          pass: process.env.contrasenia_aplicacion_google, //Contraseña de aplicación de la empresa -> Jobsy
-        },
-      });
-
-      await transporter.sendMail({
-        from: process.env.correo_electronico,
-        to: email,
-        subject: "TE UNISTE A PREMIUM!!",
+      const resend = new Resend(process.env.RESEND_API_KEY);
+      await resend.emails.send({
+        from: 'Jobsy <onboarding@resend.dev>',
+        to: [email],
+        subject: 'TE UNISTE A PREMIUM!!',
         html: mensaje,
       });
-
       res.json({ ok: true, msg: "Correo enviado correctamente" });
     } catch (err) {
       res.status(500).json({ ok: false, msg: err.message });

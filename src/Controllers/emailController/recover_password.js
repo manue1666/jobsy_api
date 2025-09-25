@@ -1,4 +1,4 @@
-import nodemailer from "nodemailer";
+import { Resend } from 'resend';
 import { UserModel } from "../../Models/User_Model.js";
 
 export const recoverPassword = async (req, res) => {
@@ -48,17 +48,10 @@ export const recoverPassword = async (req, res) => {
   `;
 
   try {
-    let transporter = nodemailer.createTransport({
-      service: "gmail",
-      auth: {
-        user: process.env.correo_electronico,
-        pass: process.env.contrasenia_aplicacion_google,
-      },
-    });
-
-    await transporter.sendMail({
-      from: process.env.correo_electronico,
-      to: email,
+    const resend = new Resend(process.env.RESEND_API_KEY);
+    await resend.emails.send({
+      from: 'Jobsy <onboarding@resend.dev>', // Cambia una vez se obtenga dominio propio
+      to: [email],
       subject: "Recuperación de contraseña Jobsy",
       html: mensaje,
     });
