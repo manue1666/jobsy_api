@@ -4,7 +4,7 @@ import { createService, deleteService, getServiceById, getUserServices, searchSe
 import { handleStripeWebhook } from "./utils/stripeWebHook.js";
 import { boostService } from "./Controllers/services_controllers/boost_service.js";
 import { startAllCronJobs } from "./utils/cron.js";
-import { deleteUser, getAllUsers, getCurrentUserProfile, login, register, updateUser } from "./Controllers/user_controllers/index.js";
+import { deleteUser, getAllUsers, getCurrentUserProfile, getUserData, login, register, updateUser } from "./Controllers/user_controllers/index.js";
 import { addFavoriteService, getFavoriteServices, removeFavoriteService } from "./Controllers/fav_services_controller/index.js";
 import { createPremiumSetupIntent, premiumUser } from "./Controllers/user_controllers/premium_user.js";
 import { cancelPremium } from "./Controllers/user_controllers/cancel_premium.js";
@@ -47,6 +47,7 @@ app.post("/user/premium/setup-intent", createPremiumSetupIntent);
 app.post("/user/premium/cancel", cancelPremium);
 app.get("/user/premium/status", statusPremium);
 app.patch("/user/password", updatePasswordUser);
+app.get("/user/data/:id", getUserData);
 
 //service endpoints
 app.post("/service/post", createService)
