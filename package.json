@@ -5,7 +5,12 @@
   "main": "index.js",
   "scripts": {
     "start": "node src/index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js test",
+    "test:comments": "node --experimental-vm-modules node_modules/jest/bin/jest.js src/__tests__/comments",
+    "test:emails": "node --experimental-vm-modules node_modules/jest/bin/jest.js src/__tests__/emails",
+    "test:fav_services": "node --experimental-vm-modules node_modules/jest/bin/jest.js src/__tests__/fav_services",
+    "test:services": "node --experimental-vm-modules node_modules/jest/bin/jest.js src/__tests__/services",
+    "test:users": "node --experimental-vm-modules node_modules/jest/bin/jest.js src/__tests__/users"
   },
   "keywords": [],
   "author": "",
@@ -26,6 +31,11 @@
     "nodemailer": "^7.0.6",
     "resend": "^6.1.0",
     "sharp": "^0.34.3",
-    "stripe": "^18.4.0"
+    "stripe": "^18.4.0",
+    "winston": "^3.18.3"
+  },
+  "devDependencies": {
+    "jest": "^30.2.0",
+    "supertest": "^7.1.4"
   }
 }
