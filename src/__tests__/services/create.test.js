@@ -6,7 +6,7 @@ const pathLogin = "/user/login";
 
 describe('Create Service API', () => {
     test('Create Service', async () => {
-        const login = await request(url).post(pathLogin).send({ email : "carlos@gmail.com", password : "123"});
+        const login = await request(url).post(pathLogin).send({ email: "carlos@gmail.com", password: "123" });
         const token = login.body.token;
 
         const service = await request(url)
@@ -19,6 +19,8 @@ describe('Create Service API', () => {
             .field('email', 'test@example.com')
             .field('address', 'Nueva York, USA')
             .field('tipo', '["domicilio","comercio"]');
-        expect(service.status).toBe(201);         
+        logger.info(new Date().toISOString() + " - Status del test: " + service.status);
+
+        expect(service.status).toBe(201);
     });
 });

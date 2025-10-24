@@ -10,6 +10,7 @@ describe("Premium API",()=>{
     const login = await request(url).post(pathLogin).send(obj);
     const token = login.body.token;
     const premium = await request(url).post(pathPremium).set("Authorization", `Bearer ${token}`);
+    logger.info(new Date().toISOString()+" - Status del test: "+premium.status);
     expect(premium.status).toBe(200);
     expect(premium.body.requiresPaymentMethod).toBe(true);
   })

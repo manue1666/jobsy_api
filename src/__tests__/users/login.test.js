@@ -1,8 +1,9 @@
 import request from "supertest";
+import logger from "../../loggerConfig/logger.js"
 
 const url = "http://localhost:4000";
 const path = "/user/login";
-const obj = { email: "classycrascras@gmail.com", password: "123" };
+const obj = { email: "carlos@gmail.com", password: "123" };
 const obj400 = { email: "ds", password: "123" };
 const obj500 = {};
 
@@ -12,6 +13,7 @@ describe("Login API", () => {
       .post(path)
       .send(obj);
       console.log(response.body)
+      logger.info(new Date().toISOString()+" - Status del test: "+response.status);
     expect(response.status).toBe(200);
     expect(response.body).toBeDefined();
   });
@@ -23,6 +25,7 @@ describe("Login API", () => {
       .post(path)
       .send(obj400);
       console.log(response.body)
+      logger.info(new Date().toISOString()+" - Status del test: "+response.status);
     expect(response.status).toBe(400);
     expect(response.body).toBeDefined();
   });
@@ -34,6 +37,7 @@ describe("Login API", () => {
       .post(path)
       .send(obj500);
       console.log(response.body)
+      logger.info(new Date().toISOString()+" - Status del test: "+response.status);
     expect(response.status).toBe(500);
     expect(response.body).toBeDefined();
   });

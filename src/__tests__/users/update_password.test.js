@@ -10,7 +10,9 @@ describe('Password API', () => {
     const login = await request(url).post(pathLogin).send(obj);
     const token = login.body.token;
 
-    const update = await request(url).patch(path).set("Authorization",`Bearer ${token}`).send({currentPassword: obj.password, password : password});
+    const update = await request(url).patch(path).set("Authorization", `Bearer ${token}`).send({ currentPassword: obj.password, password: password });
+    logger.info(new Date().toISOString() + " - Status del test: " + update.status);
+
     expect(update.status).toBe(200);
   });
 });
