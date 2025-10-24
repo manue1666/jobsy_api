@@ -13,6 +13,7 @@ import { addComment, deleteComment, getCommentsByService } from "./Controllers/c
 import { sendEmail } from "./Controllers/emailController/email.js";
 import { updatePasswordUser } from "./Controllers/user_controllers/update_password_user.js";
 import { recoverPassword } from "./Controllers/emailController/recover_password.js";
+import { searchServicesWeb } from "./Controllers/services_controllers/search_services_web.js";
 
 
 //servidor
@@ -36,7 +37,7 @@ app.get("/",(_req,res)=>{
 //ENDPOINTS
 
 //user endpoints
-app.get("/user/get", getAllUsers)
+//app.get("/user/get", getAllUsers)
 app.post("/user/regist",register)
 app.post("/user/login", login)
 app.patch("/user/patch/:id", updateUser)
@@ -58,6 +59,8 @@ app.delete("/service/delete/:id", deleteService)
 app.get("/service/search", searchServices)
 app.get("/service/nearby",searchServicesNearby)
 app.post('/service/boost/:id',boostService);
+
+app.get("/service/web", searchServicesWeb); //para mostrar servicios en web
 
 //FavService endpoints
 app.post("/fav/post/:id", addFavoriteService)
