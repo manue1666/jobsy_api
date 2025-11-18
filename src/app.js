@@ -15,6 +15,7 @@ import { updatePasswordUser } from "./Controllers/user_controllers/update_passwo
 import { recoverPassword } from "./Controllers/emailController/recover_password.js";
 import { searchServicesWeb } from "./Controllers/services_controllers/search_services_web.js";
 import { syncPremiumStatus } from "./Controllers/user_controllers/sync_premium_status.js";
+import { getBoostStatus } from "./Controllers/services_controllers/boost_status.js";
 
 
 //servidor
@@ -61,6 +62,7 @@ app.delete("/service/delete/:id", deleteService)
 app.get("/service/search", searchServices)
 app.get("/service/nearby",searchServicesNearby)
 app.post('/service/boost/:id',boostService);
+app.get('/service/boost/:id/status', getBoostStatus);
 
 app.get("/service/web", searchServicesWeb); //para mostrar servicios en web
 

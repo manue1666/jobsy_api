@@ -48,94 +48,75 @@ export const handleStripeWebhook = async (req, res) => {
     // --- BOOST SERVICE LOGIC ---
     const { serviceId, planId } = metadata;
     if (serviceId && planId) {
-      if (!serviceId || !planId) {
-        console.error("Metadata faltante o incompleta");
-        return res.status(400).json({ error: "Metadata invalida" });
-      }
+      console.log("[Webhook] Procesando boost - Service:", serviceId, "Plan:", planId);
 
+      // Validar ObjectId
       if (!Types.ObjectId.isValid(serviceId)) {
-        console.error("ObjectId invalido:", serviceId);
-        return res.status(400).json({ error: "ServiceId invalido" });
+        console.error("[Webhook] ServiceId inválido:", serviceId);
+        return res.json({ received: true });
       }
 
+      // Validar plan
       if (!BOOST_PLANS[planId]) {
-        console.error("Plan no valido:", planId);
-        return res.status(400).json({ error: "Plan no valido" });
+        console.error("[Webhook] Plan inválido:", planId);
+        return res.json({ received: true });
       }
+
       try {
-        console.log("Actualizando servicio en BD...");
-
-        const selectedPlan = BOOST_PLANS[planId];
-        const promotionDuration = selectedPlan.duration;
-        const promotedUntil = new Date(Date.now() + promotionDuration);
-
         const service = await ServiceModel.findById(serviceId);
         if (!service) {
-          console.error("Servicio no encontrado:", serviceId);
-          return res.status(404).json({ error: "Servicio no encontrado" });
+          console.error("[Webhook] Servicio no encontrado:", serviceId);
+          return res.json({ received: true });
         }
 
+        const plan = BOOST_PLANS[planId];
+        const promotedUntil = new Date(Date.now() + plan.duration);
+
+        console.log("[Webhook] Actualizando servicio en BD...");
+        console.log("[Webhook] Plan details:", {
+          planId,
+          duration: plan.duration,
+          promotedUntil: promotedUntil.toISOString(),
+        });
+
+        // Actualizar servicio
         const updatedService = await ServiceModel.findByIdAndUpdate(
           serviceId,
           {
             isPromoted: true,
             promotedUntil: promotedUntil,
             promotionPlan: planId,
+            lastPromotedAt: new Date(),
           },
-          { new: true, runValidators: true }
+          { new: true }
         );
 
-        // Registrar en PaymentLog
-        await PaymentLogModel.create({
-          user_id: service.user_id,
-          service_id: serviceId,
-          stripe_payment_intent_id:
-            event.data.object.payment_intent || event.data.object.id,
-          stripe_charge_id: event.data.object.id,
-          amount: event.data.object.amount,
-          currency: event.data.object.currency,
-          status: "succeeded",
-          type: "service_boost",
-          metadata: { serviceId, planId, promotedUntil },
-        });
+        if (!updatedService) {
+          console.error("[Webhook] Error al actualizar servicio:", serviceId);
+          return res.json({ received: true });
+        }
 
-        console.log("Servicio actualizado exitosamente:", {
+        console.log("[Webhook] ✅ Servicio promocionado exitosamente:", {
           serviceId: updatedService._id,
           isPromoted: updatedService.isPromoted,
           promotedUntil: updatedService.promotedUntil,
           promotionPlan: updatedService.promotionPlan,
         });
+
+        // Actualizar PaymentLog a succeeded
+        const paymentIntentId = event.data.object.id;
+        await PaymentLogModel.findOneAndUpdate(
+          { stripe_payment_intent_id: paymentIntentId },
+          { 
+            status: "succeeded",
+            completed_at: new Date(),
+          }
+        );
+
+        console.log("[Webhook] PaymentLog actualizado a succeeded:", paymentIntentId);
+
       } catch (dbError) {
-        console.error("Error de base de datos:", dbError);
-
-        // Registrar fallo en PaymentLog
-        await PaymentLogModel.create({
-          user_id: null,
-          service_id: serviceId,
-          stripe_payment_intent_id:
-            event.data.object.payment_intent || event.data.object.id,
-          stripe_charge_id: event.data.object.id,
-          amount: event.data.object.amount,
-          currency: event.data.object.currency,
-          status: "failed",
-          type: "service_boost",
-          error_message: dbError.message,
-          metadata: { serviceId, planId, error: dbError.message },
-        });
-
-        try {
-          const paymentIntentId = event.data.object.id;
-          await stripe.refunds.create({
-            payment_intent: paymentIntentId,
-            reason: "failed_service_activation",
-          });
-          console.log("Pago revertido por fallo en BD");
-        } catch (refundError) {
-          console.error(
-            "Error critico: No se pudo revertir el pago:",
-            refundError
-          );
-        }
+        console.error("[Webhook] ❌ Error de BD al actualizar servicio:", dbError);
       }
     }
   }
