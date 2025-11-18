@@ -1,8 +1,6 @@
 import stripePackage from "stripe";
 import { authenticateToken } from "../../utils/authMiddleware.js";
 
-
-
 const stripe = stripePackage(process.env.STRIPE_SECRET_KEY, {
   apiVersion: "2025-07-30.basil",
 });
@@ -41,6 +39,59 @@ export const premiumUser = [
         await user.save();
       }
 
+      // ===== VALIDACIÓN: Verificar si ya tiene suscripción activa =====
+      console.log("[Stripe] Verificando suscripciones existentes para:", customerId);
+      const existingSubscriptions = await stripe.subscriptions.list({
+        customer: customerId,
+        price: priceId,
+        status: "active",
+        limit: 1,
+      });
+
+      if (existingSubscriptions.data.length > 0) {
+        const activeSub = existingSubscriptions.data[0];
+        console.log("[Stripe] Usuario ya tiene suscripción activa:", activeSub.id);
+        
+        // Calcular premiumUntil
+        let premiumUntil = null;
+        if (activeSub.current_period_end) {
+          premiumUntil = new Date(activeSub.current_period_end * 1000);
+        }
+
+        return res.status(200).json({
+          message: "Ya tienes una suscripción premium activa",
+          alreadyPremium: true,
+          subscriptionId: activeSub.id,
+          status: activeSub.status,
+          currentPeriodEnd: premiumUntil,
+          clientSecret: null, // No se necesita pagar de nuevo
+        });
+      }
+
+      // También verificar suscripciones "trialing" (pruebas gratuitas)
+      const trialingSubs = await stripe.subscriptions.list({
+        customer: customerId,
+        price: priceId,
+        status: "trialing",
+        limit: 1,
+      });
+
+      if (trialingSubs.data.length > 0) {
+        const trialSub = trialingSubs.data[0];
+        console.log("[Stripe] Usuario en periodo de prueba:", trialSub.id);
+        
+        return res.status(200).json({
+          message: "Estás en periodo de prueba premium",
+          alreadyPremium: true,
+          subscriptionId: trialSub.id,
+          status: trialSub.status,
+          trialEnd: trialSub.trial_end ? new Date(trialSub.trial_end * 1000) : null,
+          clientSecret: null,
+        });
+      }
+
+      // ===== FIN VALIDACIÓN =====
+
       // Verificar/default payment method
       let customer = await stripe.customers.retrieve(customerId);
       let defaultPmId =
@@ -57,11 +108,13 @@ export const premiumUser = [
         console.log("[Stripe] PaymentMethods found:", pms.data.map(pm => pm.id));
 
         if (!pms.data.length) {
-          console.log("[Stripe] No payment methods found for customer.");
-          return res.status(200).json({
+          console.log("No payment methods found for customer.");
+          return res.status(402).json({
+            error: "payment_method_required",
             requiresPaymentMethod: true,
+            setupIntentUrl: "/user/premium/setup-intent",
             message:
-              "No hay método de pago. Ejecuta el SetupIntent y vuelve a intentar.",
+              "Configura un metodo de pago antes de suscribirte",
           });
         }
 
@@ -85,9 +138,11 @@ export const premiumUser = [
       console.log("[Stripe] Final default payment method:", defaultPmId);
 
       if (!defaultPmId) {
-        console.log("[Stripe] Failed to set default payment method.");
-        return res.status(400).json({
-          error: "No se pudo configurar el método de pago como default.",
+        console.log("Failed to set default payment method.");
+        return res.status(402).json({
+          error: "payment_method_setup_failed",
+          message:
+            "No se pudo configurar el metodo de pago. Intenta de nuevo.",
         });
       }
 
@@ -126,7 +181,7 @@ export const premiumUser = [
           console.log("[Stripe] PaymentIntent object found. ClientSecret:", clientSecret);
         }
       } else {
-  console.log("[Stripe] No payment_intent in latest_invoice. Forcing invoice payment...");
+        console.log("[Stripe] No payment_intent in latest_invoice. Forcing invoice payment...");
         try {
           await stripe.invoices.pay(latestInvoice.id);
           await new Promise((resolve) => setTimeout(resolve, 1500));

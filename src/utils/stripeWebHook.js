@@ -2,6 +2,7 @@ import stripePackage from "stripe";
 import { Types } from "mongoose";
 import { ServiceModel } from "../Models/Service_Model.js";
 import { UserModel } from "../Models/User_Model.js";
+import { PaymentLogModel } from "../Models/PaymentLog_Model.js";
 import { BOOST_PLANS } from "./constants.js";
 
 const stripe = stripePackage(process.env.STRIPE_SECRET_KEY, {
@@ -20,58 +21,59 @@ export const handleStripeWebhook = async (req, res) => {
       process.env.STRIPE_WEBHOOK_SECRET
     );
   } catch (err) {
-    console.error("❌ Error verificando webhook:", err.message);
+    console.error("Error verificando webhook:", err.message);
     return res.status(400).json({ error: `Webhook Error: ${err.message}` });
   }
 
-  console.log("🔔 Evento recibido:", event.type);
+  console.log("Evento recibido:", event.type);
 
   // Manejar eventos de pago exitoso
   if (
     event.type === "payment_intent.succeeded" ||
     event.type === "charge.succeeded"
   ) {
-    // ✅ EXTRAER METADATOS
     let metadata = {};
     if (event.type === "payment_intent.succeeded") {
       metadata = event.data.object.metadata || {};
-      console.log("💰 Procesando payment_intent.succeeded");
+      console.log("Procesando payment_intent.succeeded");
     } else if (event.type === "charge.succeeded") {
       metadata = event.data.object.metadata || {};
-      console.log("💳 Procesando charge.succeeded");
+      console.log("Procesando charge.succeeded");
     }
 
-    // --- PREMIUM USER LOGIC (legacy, deshabilitado para suscripciones) ---
-    // Las membresías premium por suscripción se manejan en los eventos
-    // customer.subscription.* e invoice.payment_succeeded más abajo.
     if (metadata.type === "premium") {
-      // Ignorado aquí; se maneja por eventos de suscripción/invoice
+      // Ignorado aqui; se maneja por eventos de suscripcion/invoice
     }
 
     // --- BOOST SERVICE LOGIC ---
     const { serviceId, planId } = metadata;
     if (serviceId && planId) {
-      // ✅ VALIDACIÓN ROBUSTA DE METADATOS
       if (!serviceId || !planId) {
-        console.error("❌ Metadata faltante o incompleta");
-        return res.status(400).json({ error: "Metadata inválida" });
+        console.error("Metadata faltante o incompleta");
+        return res.status(400).json({ error: "Metadata invalida" });
       }
 
       if (!Types.ObjectId.isValid(serviceId)) {
-        console.error("❌ ObjectId inválido:", serviceId);
-        return res.status(400).json({ error: "ServiceId inválido" });
+        console.error("ObjectId invalido:", serviceId);
+        return res.status(400).json({ error: "ServiceId invalido" });
       }
 
       if (!BOOST_PLANS[planId]) {
-        console.error("❌ Plan no válido:", planId);
-        return res.status(400).json({ error: "Plan no válido" });
+        console.error("Plan no valido:", planId);
+        return res.status(400).json({ error: "Plan no valido" });
       }
       try {
-        console.log("🔄 Actualizando servicio en BD...");
+        console.log("Actualizando servicio en BD...");
 
         const selectedPlan = BOOST_PLANS[planId];
         const promotionDuration = selectedPlan.duration;
         const promotedUntil = new Date(Date.now() + promotionDuration);
+
+        const service = await ServiceModel.findById(serviceId);
+        if (!service) {
+          console.error("Servicio no encontrado:", serviceId);
+          return res.status(404).json({ error: "Servicio no encontrado" });
+        }
 
         const updatedService = await ServiceModel.findByIdAndUpdate(
           serviceId,
@@ -83,30 +85,54 @@ export const handleStripeWebhook = async (req, res) => {
           { new: true, runValidators: true }
         );
 
-        if (!updatedService) {
-          console.error("❌ Servicio no encontrado:", serviceId);
-          return res.status(404).json({ error: "Servicio no encontrado" });
-        }
+        // Registrar en PaymentLog
+        await PaymentLogModel.create({
+          user_id: service.user_id,
+          service_id: serviceId,
+          stripe_payment_intent_id:
+            event.data.object.payment_intent || event.data.object.id,
+          stripe_charge_id: event.data.object.id,
+          amount: event.data.object.amount,
+          currency: event.data.object.currency,
+          status: "succeeded",
+          type: "service_boost",
+          metadata: { serviceId, planId, promotedUntil },
+        });
 
-        console.log("✅ Servicio actualizado exitosamente:", {
+        console.log("Servicio actualizado exitosamente:", {
           serviceId: updatedService._id,
           isPromoted: updatedService.isPromoted,
           promotedUntil: updatedService.promotedUntil,
           promotionPlan: updatedService.promotionPlan,
         });
       } catch (dbError) {
-        console.error("❌ Error de base de datos:", dbError);
-        // ⭐ REVERTIR EL PAGO SI FALLA LA BD
+        console.error("Error de base de datos:", dbError);
+
+        // Registrar fallo en PaymentLog
+        await PaymentLogModel.create({
+          user_id: null,
+          service_id: serviceId,
+          stripe_payment_intent_id:
+            event.data.object.payment_intent || event.data.object.id,
+          stripe_charge_id: event.data.object.id,
+          amount: event.data.object.amount,
+          currency: event.data.object.currency,
+          status: "failed",
+          type: "service_boost",
+          error_message: dbError.message,
+          metadata: { serviceId, planId, error: dbError.message },
+        });
+
         try {
           const paymentIntentId = event.data.object.id;
           await stripe.refunds.create({
             payment_intent: paymentIntentId,
             reason: "failed_service_activation",
           });
-          console.log("⚠️ Pago revertido por fallo en BD");
+          console.log("Pago revertido por fallo en BD");
         } catch (refundError) {
           console.error(
-            "❌ Error crítico: No se pudo revertir el pago:",
+            "Error critico: No se pudo revertir el pago:",
             refundError
           );
         }
@@ -126,14 +152,26 @@ export const handleStripeWebhook = async (req, res) => {
           promotedUntil: null,
           promotionPlan: null,
         });
-        console.log("🔄 Boost revertido por cancelación de pago");
+
+        // Registrar cancelacion
+        await PaymentLogModel.create({
+          service_id: serviceId,
+          stripe_payment_intent_id: paymentIntent.id,
+          amount: paymentIntent.amount,
+          currency: paymentIntent.currency,
+          status: "canceled",
+          type: "service_boost",
+          metadata: paymentIntent.metadata || {},
+        });
+
+        console.log("Boost revertido por cancelacion de pago");
       } catch (error) {
-        console.error("❌ Error revertiendo boost:", error);
+        console.error("Error revertiendo boost:", error);
       }
     }
   }
 
-  // Manejar eventos de suscripción premium
+  // Manejar eventos de suscripcion premium
   if (
     event.type === "customer.subscription.created" ||
     event.type === "customer.subscription.updated"
@@ -141,10 +179,7 @@ export const handleStripeWebhook = async (req, res) => {
     const subscription = event.data.object;
     const { userId, type } = subscription.metadata || {};
     if (type === "premium" && userId && Types.ObjectId.isValid(userId)) {
-      // Solo activar premium si la suscripción está activa
       if (subscription.status === "active") {
-        // Evitar escribir una fecha inválida; si falta, activamos premium y
-        // delegamos premiumUntil a invoice.payment_succeeded o a cuando Stripe provea el valor.
         try {
           const update = { isPremium: true };
           if (
@@ -155,16 +190,18 @@ export const handleStripeWebhook = async (req, res) => {
               subscription.current_period_end * 1000
             );
           } else {
-            // Si no hay fecha, calcular manualmente 30 días desde ahora si el usuario no tiene premiumUntil
             const user = await UserModel.findById(userId);
             if (!user.premiumUntil) {
-              update.premiumUntil = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+              update.premiumUntil = new Date(
+                Date.now() + 30 * 24 * 60 * 60 * 1000
+              );
               console.warn(
-                "⚠️ Calculando premiumUntil manualmente:", update.premiumUntil
+                "Calculando premiumUntil manualmente:",
+                update.premiumUntil
               );
             } else {
               console.warn(
-                "⚠️ subscription.current_period_end inválido y usuario ya tiene premiumUntil:",
+                "subscription.current_period_end invalido y usuario ya tiene premiumUntil:",
                 subscription.current_period_end
               );
             }
@@ -173,18 +210,17 @@ export const handleStripeWebhook = async (req, res) => {
             new: true,
             runValidators: true,
           });
-          console.log(`✅ Usuario activado como premium:`, userId);
+          console.log("Usuario activado como premium:", userId);
         } catch (dbError) {
-          console.error("❌ Error actualizando usuario premium:", dbError);
+          console.error("Error actualizando usuario premium:", dbError);
         }
       } else {
-        // No desactivar premium si la suscripción no está activa
-        console.log(`ℹ️ Suscripción premium no activa para usuario:`, userId);
+        console.log("Suscripcion premium no activa para usuario:", userId);
       }
     }
   }
 
-  // Activar premium al pagarse la factura (primer cobro de la suscripción)
+  // Activar premium al pagarse la factura
   if (event.type === "invoice.payment_succeeded") {
     const invoice = event.data.object;
     if (invoice.subscription) {
@@ -193,44 +229,109 @@ export const handleStripeWebhook = async (req, res) => {
         const { userId, type } = sub.metadata || {};
         if (type === "premium" && userId && Types.ObjectId.isValid(userId)) {
           if (sub.status === "active") {
-            // Preferir la fecha del periodo del invoice (línea 0), fallback a sub.current_period_end
             let premiumUntil = null;
+            
+            // Intentar obtener de la factura primero
             const line = invoice.lines?.data?.[0];
             const periodEndSec = line?.period?.end;
             if (typeof periodEndSec === "number" && !isNaN(periodEndSec)) {
               premiumUntil = new Date(periodEndSec * 1000);
-            } else if (
+              console.log("premiumUntil obtenido de invoice.lines:", premiumUntil);
+            } 
+            // Si no, obtener de la suscripcion
+            else if (
               typeof sub.current_period_end === "number" &&
               !isNaN(sub.current_period_end)
             ) {
               premiumUntil = new Date(sub.current_period_end * 1000);
-            } else {
-              console.warn(
-                "⚠️ No se pudo determinar premiumUntil (invoice/sub sin period_end)"
-              );
+              console.log("premiumUntil obtenido de subscription.current_period_end:", premiumUntil);
+            } 
+            // Si tampoco, calcular manualmente 30 dias desde ahora
+            else {
+              premiumUntil = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+              console.warn("premiumUntil calculado manualmente (30 dias):", premiumUntil);
             }
-            await UserModel.findByIdAndUpdate(
+
+            const updateData = { isPremium: true };
+            if (premiumUntil) {
+              updateData.premiumUntil = premiumUntil;
+            }
+
+            const updatedUser = await UserModel.findByIdAndUpdate(
               userId,
-              premiumUntil
-                ? { isPremium: true, premiumUntil }
-                : { isPremium: true },
+              updateData,
               { new: true, runValidators: true }
             );
-            console.log(`✅ Usuario activado como premium (invoice):`, userId);
+
+            // Registrar pago exitoso de suscripcion
+            await PaymentLogModel.create({
+              user_id: userId,
+              stripe_subscription_id: sub.id,
+              stripe_charge_id: invoice.charge,
+              amount: invoice.amount_paid,
+              currency: invoice.currency,
+              status: "succeeded",
+              type: "premium_subscription",
+              metadata: { 
+                invoiceId: invoice.id, 
+                subscriptionId: sub.id,
+                premiumUntil: premiumUntil 
+              },
+            });
+
+            console.log("Usuario activado como premium (invoice):", {
+              userId,
+              isPremium: updatedUser.isPremium,
+              premiumUntil: updatedUser.premiumUntil,
+            });
           } else {
             console.log(
-              `ℹ️ invoice.payment_succeeded pero sub no activa:`,
-              sub.id
+              "invoice.payment_succeeded pero sub no activa:",
+              sub.id,
+              "Status:",
+              sub.status
             );
           }
         }
       } catch (e) {
-        console.error("❌ Error manejando invoice.payment_succeeded:", e);
+        console.error("Error manejando invoice.payment_succeeded:", e);
       }
     }
   }
 
-  // Desactivar premium cuando la suscripción se elimina/cancela
+  // Manejar fallos de pago en facturas
+  if (event.type === "invoice.payment_failed") {
+    const invoice = event.data.object;
+    const customerId = invoice.customer;
+
+    try {
+      // Buscar usuario por stripe customer id
+      const user = await UserModel.findOne({
+        stripeCustomerId: customerId,
+      });
+
+      if (user) {
+        // Registrar fallo
+        await PaymentLogModel.create({
+          user_id: user._id,
+          stripe_subscription_id: invoice.subscription,
+          amount: invoice.amount_due,
+          currency: invoice.currency,
+          status: "failed",
+          type: "premium_subscription",
+          error_message: "Pago de factura fallido",
+          metadata: { invoiceId: invoice.id },
+        });
+
+        console.log("Pago fallido registrado para usuario:", user._id);
+        // TODO: Enviar email notificando fallo de pago
+      }
+    } catch (error) {
+      console.error("Error manejando invoice.payment_failed:", error);
+    }
+  }
+
+  // Desactivar premium cuando la suscripcion se elimina/cancela
   if (event.type === "customer.subscription.deleted") {
     const subscription = event.data.object;
     const { userId, type } = subscription.metadata || {};
@@ -241,17 +342,29 @@ export const handleStripeWebhook = async (req, res) => {
           { isPremium: false, premiumUntil: null },
           { new: true, runValidators: true }
         );
+
+        // Registrar cancelacion
+        await PaymentLogModel.create({
+          user_id: userId,
+          stripe_subscription_id: subscription.id,
+          amount: 0,
+          currency: "mxn",
+          status: "canceled",
+          type: "premium_subscription",
+          metadata: { reason: "subscription_deleted" },
+        });
+
         console.log(
-          `⚠️ Suscripción cancelada. Usuario desactivado como premium:`,
+          "Suscripcion cancelada. Usuario desactivado como premium:",
           userId
         );
       } catch (e) {
-        console.error("❌ Error al desactivar premium por cancelación:", e);
+        console.error("Error al desactivar premium por cancelacion:", e);
       }
     }
   }
 
-  // Asignar automáticamente el método de pago como default al completar SetupIntent
+  // Asignar automaticamente el metodo de pago como default al completar SetupIntent
   if (event.type === "setup_intent.succeeded") {
     const setupIntent = event.data.object;
     const customerId = setupIntent.customer;
@@ -259,11 +372,13 @@ export const handleStripeWebhook = async (req, res) => {
     if (customerId && paymentMethodId) {
       try {
         await stripe.customers.update(customerId, {
-          invoice_settings: { default_payment_method: paymentMethodId }
+          invoice_settings: { default_payment_method: paymentMethodId },
         });
-        console.log(`✅ Método de pago ${paymentMethodId} asignado como default para ${customerId}`);
+        console.log(
+          `Metodo de pago ${paymentMethodId} asignado como default para ${customerId}`
+        );
       } catch (err) {
-        console.error("❌ Error asignando método de pago default:", err);
+        console.error("Error asignando metodo de pago default:", err);
       }
     }
   }

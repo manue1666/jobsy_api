@@ -1,12 +1,12 @@
 import stripePackage from "stripe";
 import { authenticateToken } from "../../utils/authMiddleware.js";
 import { ServiceModel } from "../../Models/Service_Model.js";
+import { PaymentLogModel } from "../../Models/PaymentLog_Model.js";
 import { BOOST_PLANS } from "../../utils/constants.js";
 
 const stripe = stripePackage(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: '2025-07-30.basil'
+  apiVersion: "2025-07-30.basil",
 });
-
 
 export const boostService = [
   authenticateToken,
@@ -15,7 +15,12 @@ export const boostService = [
       const { id: serviceId } = req.params;
       const { planId } = req.body;
 
-      console.log('📦 Recibiendo boost request - ServiceId:', serviceId, 'PlanId:', planId);
+      console.log(
+        "Recibiendo boost request - ServiceId:",
+        serviceId,
+        "PlanId:",
+        planId
+      );
 
       if (!planId) {
         return res.status(400).json({ error: "Plan ID es requerido" });
@@ -30,42 +35,75 @@ export const boostService = [
         return res.status(403).json({ error: "Acceso no autorizado" });
       }
 
-      const selectedPlan = BOOST_PLANS[planId];
-      if (!selectedPlan) {
-        return res.status(400).json({ error: "Plan no válido" });
+      // Validar que no este ya en promocion activa
+      if (
+        service.isPromoted &&
+        service.promotedUntil &&
+        new Date(service.promotedUntil) > new Date()
+      ) {
+        const remainingHours = Math.ceil(
+          (new Date(service.promotedUntil) - new Date()) / (1000 * 60 * 60)
+        );
+        return res.status(400).json({
+          error: "already_promoted",
+          message: "Este servicio ya esta en promocion",
+          promotedUntil: service.promotedUntil,
+          remainingHours: remainingHours,
+        });
       }
 
-      // ✅ CREAR PAYMENT INTENT (sin capturar inmediatamente)
+      const selectedPlan = BOOST_PLANS[planId];
+      if (!selectedPlan) {
+        return res.status(400).json({ error: "Plan no valido" });
+      }
+
+      // Crear Payment Intent
       const paymentIntent = await stripe.paymentIntents.create({
         amount: selectedPlan.amount,
         currency: "mxn",
-        payment_method_types: ['card'],
-        metadata: { 
+        payment_method_types: ["card"],
+        metadata: {
           serviceId: serviceId.toString(),
-          planId: planId 
+          planId: planId,
         },
-        // ⭐ IMPORTANTE: Dejar capture_method en 'automatic' (default)
-        // para que Stripe capture automáticamente cuando el pago sea exitoso
-        capture_method: 'automatic',
+        capture_method: "automatic",
       });
 
-      console.log(`✅ PaymentIntent creado - Service: ${serviceId}, Plan: ${planId}`);
-      console.log(`💰 Amount: ${selectedPlan.amount}, Metadata:`, { serviceId, planId });
+      console.log(
+        "Payment Intent creado - Service:",
+        serviceId,
+        "Plan:",
+        planId
+      );
+      console.log("Amount:", selectedPlan.amount, "Metadata:", {
+        serviceId,
+        planId,
+      });
 
-      // ⭐ NO ACTUALIZAR BD AQUÍ - Esperar al webhook
-      
-      res.json({ 
+      // Registrar intento de pago en PaymentLog
+      await PaymentLogModel.create({
+        user_id: service.user_id,
+        service_id: serviceId,
+        stripe_payment_intent_id: paymentIntent.id,
+        amount: selectedPlan.amount,
+        currency: "mxn",
+        status: "pending",
+        type: "service_boost",
+        metadata: { serviceId, planId, planName: planId },
+      });
+
+      res.json({
         clientSecret: paymentIntent.client_secret,
         amount: selectedPlan.amount,
         paymentIntentId: paymentIntent.id,
-        status: 'requires_payment_method'
+        status: "requires_payment_method",
       });
-
     } catch (error) {
-      console.error('❌ Error en boostService:', error);
-      res.status(500).json({ 
+      console.error("Error en boostService:", error);
+      res.status(500).json({
         error: "Error al procesar el pago",
-        details: process.env.NODE_ENV === 'development' ? error.message : null
+        details:
+          process.env.NODE_ENV === "development" ? error.message : null,
       });
     }
   },
