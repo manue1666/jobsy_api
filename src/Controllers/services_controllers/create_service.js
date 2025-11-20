@@ -125,12 +125,26 @@ export const createService = [
       }
 
       // 3. Geocodificación
-      const coordinates = await geocodeAddress(address);
-      if (!coordinates) {
+      console.log("[CreateService] Iniciando geocodificación para:", address);
+      const geocodeResult = await geocodeAddress(address);
+      
+      if (!geocodeResult.success) {
+        console.error("[CreateService] Error en geocodificación:", geocodeResult.error);
+        
+        // Retornar error específico con sugerencias
         return res.status(400).json({
-          error: "No se pudo determinar la ubicación. Verifica la dirección proporcionada.",
+          error: geocodeResult.error,
+          message: geocodeResult.message,
+          suggestions: geocodeResult.suggestions,
+          field: "address",
         });
       }
+
+      console.log("[CreateService] ✅ Geocodificación exitosa:", {
+        input: address,
+        detected: geocodeResult.rawAddress,
+        coordinates: [geocodeResult.longitude, geocodeResult.latitude],
+      });
 
       // 4. Procesamiento de imágenes
       let photos = [];
@@ -141,7 +155,11 @@ export const createService = [
             "marketplace/services"
           );
         } catch (imgErr) {
-          return res.status(400).json({ error: "Error al procesar las imágenes: " + imgErr.message });
+          return res.status(400).json({ 
+            error: "image_upload_failed",
+            message: "Error al procesar las imágenes: " + imgErr.message,
+            field: "images",
+          });
         }
       }
 
@@ -153,10 +171,10 @@ export const createService = [
         description,
         phone,
         email,
-        address,
+        address: geocodeResult.rawAddress || address,
         service_location: {
           type: "Point",
-          coordinates: [coordinates.longitude, coordinates.latitude],
+          coordinates: [geocodeResult.longitude, geocodeResult.latitude],
         },
         photos,
         tipo: tipoArray,
@@ -166,13 +184,17 @@ export const createService = [
 
       res.status(201).json({
         service: service.toObject({ virtuals: true }),
+        geocodeInfo: {
+          originalAddress: address,
+          normalizedAddress: geocodeResult.rawAddress,
+        },
       });
     } catch (error) {
       console.error("Error en createService:", error);
       res.status(500).json({
-        error: "Error interno al crear el servicio",
-        details:
-          process.env.NODE_ENV === "development" ? error.message : undefined,
+        error: "internal_error",
+        message: "Error interno al crear el servicio",
+        details: process.env.NODE_ENV === "development" ? error.message : undefined,
       });
     }
   },
