@@ -3,63 +3,80 @@ import { FavServiceModel } from "../../Models/FavService_Model.js";
 import { authenticateToken } from "../../utils/authMiddleware.js";
 import { CATEGORIES } from "../../utils/constants.js";
 import mongoose from "mongoose";
+import { UserModel } from "../../Models/User_Model.js";
 
 export const searchServices = [
   authenticateToken,
   async (req, res) => {
     try {
       const {
-        query,              // búsqueda amplia (service + user)
-        category,           // una categoría
-        categories,         // múltiples categorías (coma separadas)
-        ownerId,            // id de usuario dueño
-        name,               // coincidencia parcial en service_name
-        tipo,               // uno o varios tipos (coma separada)
-        tipos,              // alias para múltiples tipos
-        address,            // coincidencia parcial
-        phone,              // coincidencia parcial
-        email,              // coincidencia parcial
-        isPromoted,         // true|false
-        promotionPlan,      // 24h|72h|1week
-        createdFrom,        // fecha ISO
-        createdTo,          // fecha ISO
-        minFavorites,       // número mínimo de favoritos
-        maxFavorites,       // número máximo de favoritos
-        sortBy,             // createdAt|favorites|promoted
+        query,
+        category,
+        categories,
+        ownerId,
+        name,
+        tipo,
+        tipos,
+        address,
+        phone,
+        email,
+        isPromoted,
+        promotionPlan,
+        createdFrom,
+        createdTo,
+        minFavorites,
+        maxFavorites,
+        sortBy,             // createdAt|favorites|distance (removido 'promoted')
         sortOrder,          // asc|desc
+        latitude,
+        longitude,
+        maxDistance,
         page: pageParam,
         limit: limitParam,
       } = req.query;
-      const authUserId = req.user.user_id; // string
+      const authUserId = req.user.user_id;
 
-      // Validar categoría simple
       if (category && !CATEGORIES.includes(category)) {
         return res.status(400).json({ error: "Categoría no válida", validCategories: CATEGORIES });
       }
 
-      // Normalizar paginación
       const page = Math.max(parseInt(pageParam) || 1, 1);
       const limit = Math.min(Math.max(parseInt(limitParam) || 10, 1), 100);
       const skip = (page - 1) * limit;
 
-      // Construir match inicial (campos directos de servicio)
+      // Actualizar ubicación del usuario
+      if (latitude && longitude) {
+        const coords = [
+          parseFloat(longitude.toString()),
+          parseFloat(latitude.toString()),
+        ];
+        
+        await UserModel.findByIdAndUpdate(
+          req.user._id,
+          {
+            user_location: {
+              type: "Point",
+              coordinates: coords,
+            },
+          },
+          { new: true }
+        );
+      }
+
+      // Construir match inicial
       const initialMatch = {};
 
-      // Categoría única
       if (category) initialMatch.category = category;
 
-      // Múltiples categorías
       if (categories) {
         const arr = (Array.isArray(categories) ? categories : categories.split(",")).map(c => c.trim()).filter(Boolean);
         if (arr.length) initialMatch.category = { $in: arr.filter(c => CATEGORIES.includes(c)) };
       }
 
-      // Dueño
       if (ownerId && mongoose.Types.ObjectId.isValid(ownerId)) {
         initialMatch.user_id = new mongoose.Types.ObjectId(ownerId);
       }
 
-      // Tipos (unificado de tipo / tipos)
       const tiposFuente = tipo || tipos;
       if (tiposFuente) {
         const tiposArray = (Array.isArray(tiposFuente) ? tiposFuente : tiposFuente.split(","))
@@ -67,22 +84,17 @@ export const searchServices = [
         if (tiposArray.length) initialMatch.tipo = { $in: tiposArray };
       }
 
-      // Nombre parcial específico (service_name)
-      if (name) {
-        initialMatch.service_name = { $regex: name, $options: "i" };
-      }
-
+      if (name) initialMatch.service_name = { $regex: name, $options: "i" };
       if (address) initialMatch.address = { $regex: address, $options: "i" };
       if (phone) initialMatch.phone = { $regex: phone, $options: "i" };
       if (email) initialMatch.email = { $regex: email, $options: "i" };
 
-      // Promoción
       if (typeof isPromoted !== 'undefined') {
-        if (isPromoted === 'true') initialMatch.isPromoted = true; else if (isPromoted === 'false') initialMatch.isPromoted = false;
+        if (isPromoted === 'true') initialMatch.isPromoted = true; 
+        else if (isPromoted === 'false') initialMatch.isPromoted = false;
       }
       if (promotionPlan) initialMatch.promotionPlan = promotionPlan;
 
-      // Rango de fechas
       if (createdFrom || createdTo) {
         initialMatch.createdAt = {};
         if (createdFrom) initialMatch.createdAt.$gte = new Date(createdFrom);
@@ -90,12 +102,33 @@ export const searchServices = [
         if (Object.keys(initialMatch.createdAt).length === 0) delete initialMatch.createdAt;
       }
 
-      // Pipeline de agregación
+      // Pipeline
       const pipeline = [];
 
-      // $match inicial (solo si hay algo que filtrar)
-      if (Object.keys(initialMatch).length) {
-        pipeline.push({ $match: initialMatch });
+      // $geoNear o $match inicial
+      if (latitude && longitude) {
+        const coords = [
+          parseFloat(longitude.toString()),
+          parseFloat(latitude.toString()),
+        ];
+        const distanceLimit = maxDistance ? parseInt(maxDistance) : 10000;
+
+        pipeline.push({
+          $geoNear: {
+            near: {
+              type: "Point",
+              coordinates: coords
+            },
+            distanceField: "distance",
+            maxDistance: distanceLimit,
+            spherical: true,
+            ...(Object.keys(initialMatch).length > 0 && { query: initialMatch })
+          }
+        });
+      } else {
+        if (Object.keys(initialMatch).length) {
+          pipeline.push({ $match: initialMatch });
+        }
       }
 
       // Unir usuario
@@ -111,7 +144,7 @@ export const searchServices = [
         { $unwind: '$user' }
       );
 
-      // Búsqueda amplia (query) incluyendo campos del usuario
+      // Búsqueda amplia
       if (query) {
         const regex = new RegExp(query, 'i');
         pipeline.push({
@@ -123,14 +156,14 @@ export const searchServices = [
               { phone: regex },
               { email: regex },
               { category: regex },
-              { tipo: regex }, // si tipo es array, regex aplica elemento a elemento
+              { tipo: regex },
               { 'user.name': regex },
             ]
           }
         });
       }
 
-      // Lookup para favoritos con agregación para evitar traer todos
+      // Lookup favoritos
       pipeline.push({
         $lookup: {
           from: 'favservices',
@@ -166,7 +199,7 @@ export const searchServices = [
         }
       });
 
-      // Filtro por rango de favoritos (después de calcular)
+      // Filtro por rango de favoritos
       const favRange = [];
       if (minFavorites) favRange.push({ favoritesCount: { $gte: parseInt(minFavorites) } });
       if (maxFavorites) favRange.push({ favoritesCount: { $lte: parseInt(maxFavorites) } });
@@ -174,7 +207,7 @@ export const searchServices = [
         pipeline.push({ $match: Object.assign({}, ...favRange) });
       }
 
-      // Proyección parcial (dejar user como objeto anidado y ocultar favMeta)
+      // Proyección
       pipeline.push({
         $project: {
           favMeta: 0,
@@ -184,15 +217,25 @@ export const searchServices = [
         }
       });
 
-      // Ordenamiento dinámico
-      const sortMap = {
-        createdAt: 'createdAt',
-        favorites: 'favoritesCount',
-        promoted: 'isPromoted'
-      };
-      const chosenSortField = sortMap[sortBy] || 'isPromoted';
-      const primaryDirection = (sortOrder === 'asc') ? 1 : -1;
-      const sortStage = { $sort: { [chosenSortField]: primaryDirection, createdAt: -1 } };
+      // *** ORDENAMIENTO MEJORADO ***
+      // SIEMPRE ordenar promocionados primero, luego por criterio seleccionado
+      const sortStage = { $sort: {} };
+      
+      // 1. SIEMPRE promocionados primero
+      sortStage.$sort.isPromoted = -1;
+
+      // 2. Luego por criterio seleccionado
+      if (sortBy === 'distance' && latitude && longitude) {
+        sortStage.$sort.distance = (sortOrder === 'asc') ? 1 : -1;
+      } else if (sortBy === 'favorites') {
+        sortStage.$sort.favoritesCount = (sortOrder === 'asc') ? 1 : -1;
+      } else if (sortBy === 'createdAt') {
+        sortStage.$sort.createdAt = (sortOrder === 'asc') ? 1 : -1;
+      } else {
+        // Por defecto: más recientes
+        sortStage.$sort.createdAt = -1;
+      }
+
       pipeline.push(sortStage);
 
       // Facet para total + paginación
@@ -203,7 +246,7 @@ export const searchServices = [
         }
       });
 
-      // Ejecutar pipeline
+      // Ejecutar
       const aggResult = await ServiceModel.aggregate(pipeline);
       const metadata = aggResult[0]?.metadata?.[0] || { total: 0 };
       const data = aggResult[0]?.data || [];
@@ -211,9 +254,8 @@ export const searchServices = [
       const total = metadata.total;
       const pages = total === 0 ? 0 : Math.ceil(total / limit);
 
-      // Calcular favoritos y estado favorito como en la versión inicial
+      // Calcular favoritos (redundante pero asegura consistencia)
       const serviceIds = data.map(doc => doc._id);
-      // Obtener todos los favoritos de estos servicios
       const favCounts = await FavServiceModel.aggregate([
         { $match: { service_id: { $in: serviceIds } } },
         { $group: { _id: "$service_id", count: { $sum: 1 } } }
@@ -222,20 +264,21 @@ export const searchServices = [
       favCounts.forEach(fc => {
         favCountMap[fc._id.toString()] = fc.count;
       });
-      // Obtener favoritos del usuario autenticado
+      
       const favoriteServices = await FavServiceModel.find({ user_id: authUserId });
       const favoriteIds = favoriteServices.map(fav => fav.service_id.toString());
 
-      // Ajustar formato de salida (user ya presente). Mantener compatibilidad: mover user_id fuera (ya está en user). Añadir isFavorite y favoritesCount ya calculados.
+      // Formatear
       const services = data.map(doc => ({
         ...doc,
-        favoritesCount: favCountMap[doc._id.toString()] || 0,
+        favoritesCount: favCountMap[doc._id.toString()] || doc.favoritesCount || 0,
         isFavorite: favoriteIds.includes(doc._id.toString()),
         user: {
           _id: doc.user._id,
           name: doc.user.name,
           profilePhoto: doc.user.profilePhoto
-        }
+        },
+        ...(doc.distance !== undefined && { distance: Math.round(doc.distance) })
       }));
 
       res.status(200).json({
@@ -261,6 +304,9 @@ export const searchServices = [
         ...(maxFavorites ? { currentMaxFavorites: parseInt(maxFavorites) } : {}),
         ...(sortBy ? { currentSortBy: sortBy } : {}),
         ...(sortOrder ? { currentSortOrder: sortOrder } : {}),
+        ...(latitude ? { currentLatitude: parseFloat(latitude) } : {}),
+        ...(longitude ? { currentLongitude: parseFloat(longitude) } : {}),
+        ...(maxDistance ? { currentMaxDistance: parseInt(maxDistance) } : {}),
       });
     } catch (error) {
       res.status(500).json({
