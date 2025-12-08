@@ -70,6 +70,8 @@ export const createService = [
         phone,
         email,
         address,
+        latitude,  
+        longitude,   
         tipo,
       } = req.body;
 
@@ -99,16 +101,14 @@ export const createService = [
         return res.status(409).json({ error: "El número de teléfono ya está registrado en otro servicio." });
       }
 
-      // 1. Procesamiento universal del campo 'tipo'
+      // 1. Procesamiento de 'tipo'
       let tipoArray = [];
       try {
         if (typeof tipo === "string") {
           if (tipo.startsWith("[")) {
             tipoArray = JSON.parse(tipo);
           } else {
-            tipoArray = tipo
-              .split(",")
-              .map((item) => item.trim().replace(/["']/g, ""));
+            tipoArray = tipo.split(",").map((item) => item.trim().replace(/["']/g, ""));
           }
         } else if (Array.isArray(tipo)) {
           tipoArray = tipo;
@@ -117,36 +117,50 @@ export const createService = [
         return res.status(400).json({ error: "El campo 'tipo' tiene un formato inválido." });
       }
 
-      // 2. Validación de tipos
       const validTypes = ["domicilio", "comercio"];
       tipoArray = tipoArray.filter((t) => validTypes.includes(t));
-      if (tipoArray.length === 0) {
-        tipoArray = [];
-      }
 
-      // 3. Geocodificación
-      console.log("[CreateService] Iniciando geocodificación para:", address);
-      const geocodeResult = await geocodeAddress(address);
-      
-      if (!geocodeResult.success) {
-        console.error("[CreateService] Error en geocodificación:", geocodeResult.error);
-        
-        // Retornar error específico con sugerencias
+      // 2. Procesamiento de ubicación
+      let serviceLocation;
+
+      // Las coordenadas SIEMPRE deben venir del frontend
+      if (latitude === undefined || longitude === undefined || latitude === null || longitude === null) {
         return res.status(400).json({
-          error: geocodeResult.error,
-          message: geocodeResult.message,
-          suggestions: geocodeResult.suggestions,
-          field: "address",
+          error: "missing_coordinates",
+          message: "Las coordenadas son requeridas. Por favor, verifica la dirección o usa GPS.",
+          field: "coordinates",
         });
       }
 
-      console.log("[CreateService] ✅ Geocodificación exitosa:", {
-        input: address,
-        detected: geocodeResult.rawAddress,
-        coordinates: [geocodeResult.longitude, geocodeResult.latitude],
-      });
+      const lat = parseFloat(latitude);
+      const lon = parseFloat(longitude);
 
-      // 4. Procesamiento de imágenes
+      // Validar que sean números válidos
+      if (isNaN(lat) || isNaN(lon)) {
+        return res.status(400).json({
+          error: "invalid_coordinates",
+          message: "Las coordenadas proporcionadas no son válidas",
+          field: "coordinates",
+        });
+      }
+
+      // Validar rango
+      if (lon < -180 || lon > 180 || lat < -90 || lat > 90) {
+        return res.status(400).json({
+          error: "coordinates_out_of_range",
+          message: "Las coordenadas están fuera del rango válido",
+          field: "coordinates",
+        });
+      }
+
+      serviceLocation = {
+        type: "Point",
+        coordinates: [lon, lat],
+      };
+
+      console.log("[CreateService] ✅ Coordenadas validadas:", { latitude: lat, longitude: lon });
+
+      // 3. Procesamiento de imágenes
       let photos = [];
       if (req.files?.length > 0) {
         try {
@@ -155,7 +169,7 @@ export const createService = [
             "marketplace/services"
           );
         } catch (imgErr) {
-          return res.status(400).json({ 
+          return res.status(400).json({
             error: "image_upload_failed",
             message: "Error al procesar las imágenes: " + imgErr.message,
             field: "images",
@@ -163,7 +177,7 @@ export const createService = [
         }
       }
 
-      // 5. Creación del servicio
+      // 4. Creación del servicio
       const service = new ServiceModel({
         user_id: req.user.user_id,
         service_name,
@@ -171,11 +185,8 @@ export const createService = [
         description,
         phone,
         email,
-        address: geocodeResult.rawAddress || address,
-        service_location: {
-          type: "Point",
-          coordinates: [geocodeResult.longitude, geocodeResult.latitude],
-        },
+        address,
+        service_location: serviceLocation,
         photos,
         tipo: tipoArray,
       });
@@ -184,11 +195,9 @@ export const createService = [
 
       res.status(201).json({
         service: service.toObject({ virtuals: true }),
-        geocodeInfo: {
-          originalAddress: address,
-          normalizedAddress: geocodeResult.rawAddress,
-        },
+        message: "Servicio creado exitosamente",
       });
+      
     } catch (error) {
       console.error("Error en createService:", error);
       res.status(500).json({

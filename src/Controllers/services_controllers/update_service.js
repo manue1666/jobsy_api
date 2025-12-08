@@ -26,7 +26,7 @@ export const updateService = [
           error: "Servicio no encontrado o no tienes permisos",
         });
 
-      // Campos permitidos
+      // Campos permitidos (añadir latitude y longitude)
       const allowedUpdates = [
         "service_name",
         "category",
@@ -34,6 +34,8 @@ export const updateService = [
         "phone",
         "email",
         "address",
+        "latitude",   // ← NUEVO
+        "longitude",  // ← NUEVO
         "tipo",
       ];
       const updates = Object.keys(updateData).filter(u => allowedUpdates.includes(u));
@@ -83,14 +85,11 @@ export const updateService = [
             if (updateData.tipo.startsWith("[")) {
               tipoArray = JSON.parse(updateData.tipo);
             } else {
-              tipoArray = updateData.tipo
-                .split(",")
-                .map(item => item.trim().replace(/["']/g, ""));
+              tipoArray = updateData.tipo.split(",").map(item => item.trim().replace(/["']/g, ""));
             }
           } else if (Array.isArray(updateData.tipo)) {
             tipoArray = updateData.tipo;
           }
-          // Validación de tipos
           const validTypes = ["domicilio", "comercio"];
           tipoArray = tipoArray.filter(t => validTypes.includes(t));
           service.tipo = tipoArray.length > 0 ? tipoArray : [];
@@ -100,17 +99,56 @@ export const updateService = [
         delete updateData.tipo;
       }
 
-      // Geocodificación si se actualiza la dirección
-      if (updateData.address) {
-        const coordinates = await geocodeAddress(updateData.address);
-        if (!coordinates) {
+      // Procesamiento de ubicación
+      const hasLatitude = updateData.latitude !== undefined && updateData.latitude !== null;
+      const hasLongitude = updateData.longitude !== undefined && updateData.longitude !== null;
+      
+      if (hasLatitude && hasLongitude) {
+        // Usar coordenadas proporcionadas
+        const lat = parseFloat(updateData.latitude);
+        const lon = parseFloat(updateData.longitude);
+        
+        if (isNaN(lat) || isNaN(lon)) {
           return res.status(400).json({
-            error: "No se pudo determinar la nueva ubicación. Verifica la dirección.",
+            error: "invalid_coordinates",
+            message: "Las coordenadas proporcionadas no son válidas",
           });
         }
+        
+        if (lon < -180 || lon > 180 || lat < -90 || lat > 90) {
+          return res.status(400).json({
+            error: "coordinates_out_of_range",
+            message: "Las coordenadas están fuera del rango válido",
+          });
+        }
+        
         service.service_location = {
           type: "Point",
-          coordinates: [coordinates.longitude, coordinates.latitude],
+          coordinates: [lon, lat],
+        };
+        
+        console.log("[UpdateService] ✅ Usando coordenadas del cliente:", { latitude: lat, longitude: lon });
+        
+        delete updateData.latitude;
+        delete updateData.longitude;
+        
+      } else if (updateData.address && !hasLatitude && !hasLongitude) {
+        // FALLBACK: Solo si se actualiza dirección sin coordenadas
+        console.log("[UpdateService] ⚠️ Dirección actualizada sin coordenadas, geocodificando...");
+        
+        const geocodeResult = await geocodeAddress(updateData.address);
+        
+        if (!geocodeResult.success) {
+          return res.status(400).json({
+            error: geocodeResult.error,
+            message: geocodeResult.message,
+            suggestions: geocodeResult.suggestions,
+          });
+        }
+        
+        service.service_location = {
+          type: "Point",
+          coordinates: [geocodeResult.longitude, geocodeResult.latitude],
         };
       }
 
@@ -142,10 +180,15 @@ export const updateService = [
 
       // Actualizar los demás campos
       updates.forEach(update => {
-        if (update !== "address" && update !== "tipo") {
+        if (update !== "address" && update !== "tipo" && update !== "latitude" && update !== "longitude") {
           service[update] = updateData[update];
         }
       });
+
+      // Actualizar address si se proporcionó
+      if (updateData.address) {
+        service.address = updateData.address;
+      }
 
       await service.save();
 

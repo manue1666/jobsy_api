@@ -26,8 +26,8 @@ export const searchServices = [
         createdTo,
         minFavorites,
         maxFavorites,
-        sortBy,             // createdAt|favorites|distance (removido 'promoted')
-        sortOrder,          // asc|desc
+        sortBy,             
+        sortOrder,
         latitude,
         longitude,
         maxDistance,
@@ -217,7 +217,7 @@ export const searchServices = [
         }
       });
 
-      // *** ORDENAMIENTO MEJORADO ***
+  
       // SIEMPRE ordenar promocionados primero, luego por criterio seleccionado
       const sortStage = { $sort: {} };
       
